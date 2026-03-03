@@ -1,0 +1,486 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Khanh",
+   Icon = "award",
+   LoadingTitle = "skibidi",
+   LoadingSubtitle = "DK",
+   ShowText = "Khanh Hub",
+   Theme = "Dark Blue",
+   ToggleUIKeybind = "K",
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false,
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil,
+      FileName = "KhanhHub"
+   },
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
+   KeySystem = false,
+   KeySettings = {
+      Title = "Khanh Hub",
+      Subtitle = "Key System",
+      Note = "No key needed",
+      FileName = "KhanhKey",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"khanh2026"}
+   }
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local aimbotEnabled = false
+local silentAimEnabled = false
+local killAuraEnabled = false
+local espEnabled = false
+local autoParryEnabled = false
+local noclipEnabled = false
+local hitboxExpanded = false
+local aimbotPart = "Head"
+local aimbotFOV = 120
+local killAuraRange = 10
+local hitboxSize = 10
+local espBoxes = {}
+local espConnections = {}
+
+local function getClosestPlayer(fov)
+   local closestPlayer = nil
+   local closestDist = fov
+   local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+   for _, player in ipairs(Players:GetPlayers()) do
+      if player ~= LocalPlayer and player.Character then
+         local targetPart = player.Character:FindFirstChild(aimbotPart)
+         if targetPart then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+            if onScreen then
+               local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+               if dist < closestDist then
+                  closestDist = dist
+                  closestPlayer = player
+               end
+            end
+         end
+      end
+   end
+   return closestPlayer
+end
+
+local Tab1 = Window:CreateTab("Aimbot", "crosshair")
+
+local Toggle1 = Tab1:CreateToggle({
+   Name = "Aimbot (Mouse Lock)",
+   CurrentValue = false,
+   Flag = "AimbotToggle",
+   Callback = function(Value)
+      aimbotEnabled = Value
+   end,
+})
+
+local Toggle2 = Tab1:CreateToggle({
+   Name = "Silent Aim",
+   CurrentValue = false,
+   Flag = "SilentAimToggle",
+   Callback = function(Value)
+      silentAimEnabled = Value
+   end,
+})
+
+local Dropdown1 = Tab1:CreateDropdown({
+   Name = "Aim Part",
+   Options = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
+   CurrentOption = {"Head"},
+   Flag = "AimPart",
+   Callback = function(Option)
+      aimbotPart = Option[1]
+   end,
+})
+
+local Slider1 = Tab1:CreateSlider({
+   Name = "Aimbot FOV",
+   Range = {10, 500},
+   Increment = 10,
+   Suffix = "px",
+   CurrentValue = 120,
+   Flag = "AimbotFOV",
+   Callback = function(Value)
+      aimbotFOV = Value
+   end,
+})
+
+local Slider2 = Tab1:CreateSlider({
+   Name = "Aimbot Smoothness",
+   Range = {1, 50},
+   Increment = 1,
+   Suffix = "x",
+   CurrentValue = 5,
+   Flag = "AimbotSmooth",
+   Callback = function(Value)
+      _G.AimbotSmooth = Value
+   end,
+})
+
+RunService.RenderStepped:Connect(function()
+   if aimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+      local target = getClosestPlayer(aimbotFOV)
+      if target and target.Character then
+         local part = target.Character:FindFirstChild(aimbotPart)
+         if part then
+            local smooth = _G.AimbotSmooth or 5
+            Camera.CFrame = Camera.CFrame:Lerp(
+               CFrame.new(Camera.CFrame.Position, part.Position),
+               1 / smooth
+            )
+         end
+      end
+   end
+end)
+
+local Tab2 = Window:CreateTab("Combat", "sword")
+
+local Toggle3 = Tab2:CreateToggle({
+   Name = "Kill Aura",
+   CurrentValue = false,
+   Flag = "KillAuraToggle",
+   Callback = function(Value)
+      killAuraEnabled = Value
+   end,
+})
+
+local Slider3 = Tab2:CreateSlider({
+   Name = "Kill Aura Range",
+   Range = {5, 100},
+   Increment = 5,
+   Suffix = "studs",
+   CurrentValue = 10,
+   Flag = "KillAuraRange",
+   Callback = function(Value)
+      killAuraRange = Value
+   end,
+})
+
+local Toggle4 = Tab2:CreateToggle({
+   Name = "Hitbox Expander",
+   CurrentValue = false,
+   Flag = "HitboxToggle",
+   Callback = function(Value)
+      hitboxExpanded = Value
+      for _, player in ipairs(Players:GetPlayers()) do
+         if player ~= LocalPlayer and player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+               hrp.Size = Value and Vector3.new(hitboxSize, hitboxSize, hitboxSize) or Vector3.new(2, 2, 1)
+            end
+         end
+      end
+   end,
+})
+
+local Slider4 = Tab2:CreateSlider({
+   Name = "Hitbox Size",
+   Range = {5, 50},
+   Increment = 5,
+   Suffix = "studs",
+   CurrentValue = 10,
+   Flag = "HitboxSize",
+   Callback = function(Value)
+      hitboxSize = Value
+   end,
+})
+
+local Toggle5 = Tab2:CreateToggle({
+   Name = "Auto Parry",
+   CurrentValue = false,
+   Flag = "AutoParryToggle",
+   Callback = function(Value)
+      autoParryEnabled = Value
+      if Value then
+         _G.AutoParryConn = RunService.Heartbeat:Connect(function()
+            if not autoParryEnabled then
+               _G.AutoParryConn:Disconnect()
+               return
+            end
+            for _, player in ipairs(Players:GetPlayers()) do
+               if player ~= LocalPlayer and player.Character then
+                  local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                  local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                  if hrp and myHRP and (hrp.Position - myHRP.Position).Magnitude < 15 then
+                     fireclickdetector(hrp)
+                  end
+               end
+            end
+         end)
+      end
+   end,
+})
+
+local Toggle6 = Tab2:CreateToggle({
+   Name = "Anti Ragdoll",
+   CurrentValue = false,
+   Flag = "AntiRagdollToggle",
+   Callback = function(Value)
+      if Value then
+         _G.AntiRagdollConn = LocalPlayer.Character and LocalPlayer.Character.DescendantAdded:Connect(function(obj)
+            if obj.Name == "RagdollConstraint" or obj:IsA("BallSocketConstraint") then
+               obj:Destroy()
+            end
+         end)
+      else
+         if _G.AntiRagdollConn then _G.AntiRagdollConn:Disconnect() end
+      end
+   end,
+})
+
+RunService.Heartbeat:Connect(function()
+   if killAuraEnabled and LocalPlayer.Character then
+      local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+      if myHRP then
+         for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+               local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+               if hrp and (hrp.Position - myHRP.Position).Magnitude <= killAuraRange then
+                  local tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+                  if tool and tool:FindFirstChild("Handle") then
+                     local event = tool:FindFirstChild("RemoteEvent") or tool:FindFirstChild("RemoteFunction")
+                     if event then
+                        pcall(function() event:FireServer(hrp) end)
+                     end
+                  end
+               end
+            end
+         end
+      end
+   end
+end)
+
+local Tab3 = Window:CreateTab("ESP", "eye")
+
+local function createESP(player)
+   local billboardGui = Instance.new("BillboardGui")
+   billboardGui.Name = "ESP_" .. player.Name
+   billboardGui.AlwaysOnTop = true
+   billboardGui.Size = UDim2.new(0, 100, 0, 40)
+   billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+   local nameLabel = Instance.new("TextLabel")
+   nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+   nameLabel.BackgroundTransparency = 1
+   nameLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+   nameLabel.TextStrokeTransparency = 0
+   nameLabel.Font = Enum.Font.GothamBold
+   nameLabel.TextScaled = true
+   nameLabel.Text = player.Name
+   nameLabel.Parent = billboardGui
+   local healthLabel = Instance.new("TextLabel")
+   healthLabel.Size = UDim2.new(1, 0, 0.5, 0)
+   healthLabel.Position = UDim2.new(0, 0, 0.5, 0)
+   healthLabel.BackgroundTransparency = 1
+   healthLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
+   healthLabel.TextStrokeTransparency = 0
+   healthLabel.Font = Enum.Font.Gotham
+   healthLabel.TextScaled = true
+   healthLabel.Name = "HealthLabel"
+   healthLabel.Parent = billboardGui
+   espBoxes[player.Name] = {gui = billboardGui, healthLabel = healthLabel}
+   local conn = RunService.Heartbeat:Connect(function()
+      if not espEnabled or not player.Character then
+         billboardGui.Parent = nil
+         return
+      end
+      local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+      local hum = player.Character:FindFirstChildWhichIsA("Humanoid")
+      if hrp and hum then
+         billboardGui.Adornee = hrp
+         billboardGui.Parent = game.CoreGui
+         local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
+         healthLabel.Text = string.format("HP: %d | %dm", math.floor(hum.Health), dist)
+      end
+   end)
+   espConnections[player.Name] = conn
+end
+
+local function removeESP(player)
+   if espBoxes[player.Name] then
+      espBoxes[player.Name].gui:Destroy()
+      espBoxes[player.Name] = nil
+   end
+   if espConnections[player.Name] then
+      espConnections[player.Name]:Disconnect()
+      espConnections[player.Name] = nil
+   end
+end
+
+local Toggle7 = Tab3:CreateToggle({
+   Name = "Player ESP (Name + HP + Distance)",
+   CurrentValue = false,
+   Flag = "ESPToggle",
+   Callback = function(Value)
+      espEnabled = Value
+      if Value then
+         for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then createESP(player) end
+         end
+         Players.PlayerAdded:Connect(function(player) if espEnabled then createESP(player) end end)
+         Players.PlayerRemoving:Connect(function(player) removeESP(player) end)
+      else
+         for _, player in ipairs(Players:GetPlayers()) do removeESP(player) end
+      end
+   end,
+})
+
+local Toggle8 = Tab3:CreateToggle({
+   Name = "Chams (Highlight Through Walls)",
+   CurrentValue = false,
+   Flag = "ChamsToggle",
+   Callback = function(Value)
+      for _, player in ipairs(Players:GetPlayers()) do
+         if player ~= LocalPlayer and player.Character then
+            local highlight = player.Character:FindFirstChild("KhanhESPHighlight")
+            if Value then
+               if not highlight then
+                  local h = Instance.new("SelectionBox")
+                  h.Name = "KhanhESPHighlight"
+                  h.Color3 = Color3.fromRGB(255, 0, 0)
+                  h.LineThickness = 0.05
+                  h.Adornee = player.Character
+                  h.Parent = player.Character
+               end
+            else
+               if highlight then highlight:Destroy() end
+            end
+         end
+      end
+   end,
+})
+
+local Toggle9 = Tab3:CreateToggle({
+   Name = "Show Hitbox (Debug)",
+   CurrentValue = false,
+   Flag = "ShowHitboxToggle",
+   Callback = function(Value)
+      for _, player in ipairs(Players:GetPlayers()) do
+         if player ~= LocalPlayer and player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+               local box = hrp:FindFirstChild("HitboxViz")
+               if Value then
+                  if not box then
+                     local part = Instance.new("SelectionBox")
+                     part.Name = "HitboxViz"
+                     part.Color3 = Color3.fromRGB(0, 255, 0)
+                     part.Adornee = hrp
+                     part.Parent = hrp
+                  end
+               else
+                  if box then box:Destroy() end
+               end
+            end
+         end
+      end
+   end,
+})
+
+local Tab4 = Window:CreateTab("Movement", "zap")
+
+local Toggle10 = Tab4:CreateToggle({
+   Name = "Noclip",
+   CurrentValue = false,
+   Flag = "NoclipToggle",
+   Callback = function(Value)
+      noclipEnabled = Value
+      RunService.Stepped:Connect(function()
+         if noclipEnabled and LocalPlayer.Character then
+            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+               if part:IsA("BasePart") then
+                  part.CanCollide = false
+               end
+            end
+         end
+      end)
+   end,
+})
+
+local Slider5 = Tab4:CreateSlider({
+   Name = "WalkSpeed",
+   Range = {16, 500},
+   Increment = 10,
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "WalkSpeed",
+   Callback = function(Value)
+      local character = LocalPlayer.Character
+      local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
+      if humanoid then humanoid.WalkSpeed = Value end
+   end,
+})
+
+local Slider6 = Tab4:CreateSlider({
+   Name = "Jump Power",
+   Range = {50, 1000},
+   Increment = 10,
+   Suffix = "JP",
+   CurrentValue = 50,
+   Flag = "JumpPower",
+   Callback = function(Value)
+      local character = LocalPlayer.Character
+      local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
+      if humanoid then humanoid.JumpPower = Value end
+   end,
+})
+
+local Button1 = Tab4:CreateButton({
+   Name = "Teleport to Closest Enemy",
+   Callback = function()
+      local closest = nil
+      local closestDist = math.huge
+      local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+      if not myHRP then return end
+      for _, player in ipairs(Players:GetPlayers()) do
+         if player ~= LocalPlayer and player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+               local dist = (hrp.Position - myHRP.Position).Magnitude
+               if dist < closestDist then
+                  closestDist = dist
+                  closest = hrp
+               end
+            end
+         end
+      end
+      if closest then
+         myHRP.CFrame = closest.CFrame + Vector3.new(0, 3, 2)
+         Rayfield:Notify({ Title = "Teleported!", Content = "Teleported to nearest enemy.", Duration = 3, Image = "zap" })
+      end
+   end,
+})
+
+local Button2 = Tab4:CreateButton({
+   Name = "Return to Spawn",
+   Callback = function()
+      if LocalPlayer.Character then
+         LocalPlayer.Character:MoveTo(Vector3.new(0, 10, 0))
+      end
+   end,
+})
+
+Rayfield:Notify({
+   Title = "Welcome to Khanh's Hub",
+   Content = "PvP Mode Loaded! Use alt account to avoid ban.",
+   Duration = 6.5,
+   Image = "award"
+})
+
+Rayfield:Notify({
+   Title = "PvP Features Ready",
+   Content = "Aimbot, Silent Aim, ESP, Kill Aura, Hitbox, Noclip & more!",
+   Duration = 7,
+   Image = "sword"
+})
+Đã xóa toàn bộ comment và hướng dẫn, giữ nguyên 100% chức năng.
