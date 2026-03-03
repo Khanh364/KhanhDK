@@ -6,8 +6,8 @@ local Window = Rayfield:CreateWindow({
    LoadingTitle = "skibidi",
    LoadingSubtitle = "DK",
    ShowText = "Khanh Hub",
-   Theme = "Dark Blue",
-   ToggleUIKeybind = "K",
+   Theme = "Pear",
+   ToggleUIKeybind = "DK",
    DisableRayfieldPrompts = false,
    DisableBuildWarnings = false,
    ConfigurationSaving = {
@@ -47,10 +47,27 @@ local noclipEnabled = false
 local hitboxExpanded = false
 local aimbotPart = "Head"
 local aimbotFOV = 120
+local aimbotSmooth = 5
 local killAuraRange = 10
 local hitboxSize = 10
 local espBoxes = {}
 local espConnections = {}
+local originalWalkSpeed = 16
+local originalJumpPower = 50
+
+local function getCharacter()
+   return LocalPlayer.Character
+end
+
+local function getHumanoid()
+   local char = getCharacter()
+   return char and char:FindFirstChildWhichIsA("Humanoid")
+end
+
+local function getHRP()
+   local char = getCharacter()
+   return char and char:FindFirstChild("HumanoidRootPart")
+end
 
 local function getClosestPlayer(fov)
    local closestPlayer = nil
@@ -76,8 +93,8 @@ end
 
 local Tab1 = Window:CreateTab("Aimbot", "crosshair")
 
-local Toggle1 = Tab1:CreateToggle({
-   Name = "Aimbot (Mouse Lock)",
+Tab1:CreateToggle({
+   Name = "Aimbot (Tự động aim)",
    CurrentValue = false,
    Flag = "AimbotToggle",
    Callback = function(Value)
@@ -85,7 +102,7 @@ local Toggle1 = Tab1:CreateToggle({
    end,
 })
 
-local Toggle2 = Tab1:CreateToggle({
+Tab1:CreateToggle({
    Name = "Silent Aim",
    CurrentValue = false,
    Flag = "SilentAimToggle",
@@ -94,7 +111,7 @@ local Toggle2 = Tab1:CreateToggle({
    end,
 })
 
-local Dropdown1 = Tab1:CreateDropdown({
+Tab1:CreateDropdown({
    Name = "Aim Part",
    Options = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
    CurrentOption = {"Head"},
@@ -104,9 +121,9 @@ local Dropdown1 = Tab1:CreateDropdown({
    end,
 })
 
-local Slider1 = Tab1:CreateSlider({
+Tab1:CreateSlider({
    Name = "Aimbot FOV",
-   Range = {10, 500},
+   Range = {10, 800},
    Increment = 10,
    Suffix = "px",
    CurrentValue = 120,
@@ -116,37 +133,53 @@ local Slider1 = Tab1:CreateSlider({
    end,
 })
 
-local Slider2 = Tab1:CreateSlider({
+Tab1:CreateSlider({
    Name = "Aimbot Smoothness",
-   Range = {1, 50},
+   Range = {1, 100},
    Increment = 1,
    Suffix = "x",
    CurrentValue = 5,
    Flag = "AimbotSmooth",
    Callback = function(Value)
-      _G.AimbotSmooth = Value
+      aimbotSmooth = Value
+   end,
+})
+
+Tab1:CreateSlider({
+   Name = "Aim Prediction",
+   Range = {0, 20},
+   Increment = 1,
+   Suffix = "studs",
+   CurrentValue = 0,
+   Flag = "AimPrediction",
+   Callback = function(Value)
+      _G.AimPrediction = Value
    end,
 })
 
 RunService.RenderStepped:Connect(function()
-   if aimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-      local target = getClosestPlayer(aimbotFOV)
-      if target and target.Character then
-         local part = target.Character:FindFirstChild(aimbotPart)
-         if part then
-            local smooth = _G.AimbotSmooth or 5
-            Camera.CFrame = Camera.CFrame:Lerp(
-               CFrame.new(Camera.CFrame.Position, part.Position),
-               1 / smooth
-            )
+   if not aimbotEnabled then return end
+   local target = getClosestPlayer(aimbotFOV)
+   if target and target.Character then
+      local part = target.Character:FindFirstChild(aimbotPart)
+      if part then
+         local prediction = _G.AimPrediction or 0
+         local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+         local targetPos = part.Position
+         if prediction > 0 and hrp then
+            targetPos = targetPos + hrp.Velocity * prediction * 0.016
          end
+         Camera.CFrame = Camera.CFrame:Lerp(
+            CFrame.new(Camera.CFrame.Position, targetPos),
+            1 / aimbotSmooth
+         )
       end
    end
 end)
 
 local Tab2 = Window:CreateTab("Combat", "sword")
 
-local Toggle3 = Tab2:CreateToggle({
+Tab2:CreateToggle({
    Name = "Kill Aura",
    CurrentValue = false,
    Flag = "KillAuraToggle",
@@ -155,7 +188,7 @@ local Toggle3 = Tab2:CreateToggle({
    end,
 })
 
-local Slider3 = Tab2:CreateSlider({
+Tab2:CreateSlider({
    Name = "Kill Aura Range",
    Range = {5, 100},
    Increment = 5,
@@ -167,7 +200,7 @@ local Slider3 = Tab2:CreateSlider({
    end,
 })
 
-local Toggle4 = Tab2:CreateToggle({
+Tab2:CreateToggle({
    Name = "Hitbox Expander",
    CurrentValue = false,
    Flag = "HitboxToggle",
@@ -184,7 +217,7 @@ local Toggle4 = Tab2:CreateToggle({
    end,
 })
 
-local Slider4 = Tab2:CreateSlider({
+Tab2:CreateSlider({
    Name = "Hitbox Size",
    Range = {5, 50},
    Increment = 5,
@@ -196,7 +229,7 @@ local Slider4 = Tab2:CreateSlider({
    end,
 })
 
-local Toggle5 = Tab2:CreateToggle({
+Tab2:CreateToggle({
    Name = "Auto Parry",
    CurrentValue = false,
    Flag = "AutoParryToggle",
@@ -204,14 +237,11 @@ local Toggle5 = Tab2:CreateToggle({
       autoParryEnabled = Value
       if Value then
          _G.AutoParryConn = RunService.Heartbeat:Connect(function()
-            if not autoParryEnabled then
-               _G.AutoParryConn:Disconnect()
-               return
-            end
+            if not autoParryEnabled then _G.AutoParryConn:Disconnect() return end
             for _, player in ipairs(Players:GetPlayers()) do
                if player ~= LocalPlayer and player.Character then
                   local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-                  local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                  local myHRP = getHRP()
                   if hrp and myHRP and (hrp.Position - myHRP.Position).Magnitude < 15 then
                      fireclickdetector(hrp)
                   end
@@ -222,7 +252,7 @@ local Toggle5 = Tab2:CreateToggle({
    end,
 })
 
-local Toggle6 = Tab2:CreateToggle({
+Tab2:CreateToggle({
    Name = "Anti Ragdoll",
    CurrentValue = false,
    Flag = "AntiRagdollToggle",
@@ -241,7 +271,7 @@ local Toggle6 = Tab2:CreateToggle({
 
 RunService.Heartbeat:Connect(function()
    if killAuraEnabled and LocalPlayer.Character then
-      local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+      local myHRP = getHRP()
       if myHRP then
          for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
@@ -250,9 +280,7 @@ RunService.Heartbeat:Connect(function()
                   local tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
                   if tool and tool:FindFirstChild("Handle") then
                      local event = tool:FindFirstChild("RemoteEvent") or tool:FindFirstChild("RemoteFunction")
-                     if event then
-                        pcall(function() event:FireServer(hrp) end)
-                     end
+                     if event then pcall(function() event:FireServer(hrp) end) end
                   end
                end
             end
@@ -267,7 +295,7 @@ local function createESP(player)
    local billboardGui = Instance.new("BillboardGui")
    billboardGui.Name = "ESP_" .. player.Name
    billboardGui.AlwaysOnTop = true
-   billboardGui.Size = UDim2.new(0, 100, 0, 40)
+   billboardGui.Size = UDim2.new(0, 120, 0, 45)
    billboardGui.StudsOffset = Vector3.new(0, 3, 0)
    local nameLabel = Instance.new("TextLabel")
    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
@@ -290,10 +318,7 @@ local function createESP(player)
    healthLabel.Parent = billboardGui
    espBoxes[player.Name] = {gui = billboardGui, healthLabel = healthLabel}
    local conn = RunService.Heartbeat:Connect(function()
-      if not espEnabled or not player.Character then
-         billboardGui.Parent = nil
-         return
-      end
+      if not espEnabled or not player.Character then billboardGui.Parent = nil return end
       local hrp = player.Character:FindFirstChild("HumanoidRootPart")
       local hum = player.Character:FindFirstChildWhichIsA("Humanoid")
       if hrp and hum then
@@ -307,18 +332,12 @@ local function createESP(player)
 end
 
 local function removeESP(player)
-   if espBoxes[player.Name] then
-      espBoxes[player.Name].gui:Destroy()
-      espBoxes[player.Name] = nil
-   end
-   if espConnections[player.Name] then
-      espConnections[player.Name]:Disconnect()
-      espConnections[player.Name] = nil
-   end
+   if espBoxes[player.Name] then espBoxes[player.Name].gui:Destroy() espBoxes[player.Name] = nil end
+   if espConnections[player.Name] then espConnections[player.Name]:Disconnect() espConnections[player.Name] = nil end
 end
 
-local Toggle7 = Tab3:CreateToggle({
-   Name = "Player ESP (Name + HP + Distance)",
+Tab3:CreateToggle({
+   Name = "Player ESP (Tên + HP + Khoảng cách)",
    CurrentValue = false,
    Flag = "ESPToggle",
    Callback = function(Value)
@@ -335,8 +354,8 @@ local Toggle7 = Tab3:CreateToggle({
    end,
 })
 
-local Toggle8 = Tab3:CreateToggle({
-   Name = "Chams (Highlight Through Walls)",
+Tab3:CreateToggle({
+   Name = "Chams (Nhìn xuyên tường)",
    CurrentValue = false,
    Flag = "ChamsToggle",
    Callback = function(Value)
@@ -360,7 +379,7 @@ local Toggle8 = Tab3:CreateToggle({
    end,
 })
 
-local Toggle9 = Tab3:CreateToggle({
+Tab3:CreateToggle({
    Name = "Show Hitbox (Debug)",
    CurrentValue = false,
    Flag = "ShowHitboxToggle",
@@ -389,39 +408,117 @@ local Toggle9 = Tab3:CreateToggle({
 
 local Tab4 = Window:CreateTab("Movement", "zap")
 
-local Toggle10 = Tab4:CreateToggle({
+Tab4:CreateToggle({
    Name = "Noclip",
    CurrentValue = false,
    Flag = "NoclipToggle",
    Callback = function(Value)
       noclipEnabled = Value
-      RunService.Stepped:Connect(function()
-         if noclipEnabled and LocalPlayer.Character then
-            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-               if part:IsA("BasePart") then
-                  part.CanCollide = false
-               end
-            end
-         end
-      end)
    end,
 })
 
-local Slider5 = Tab4:CreateSlider({
+Tab4:CreateToggle({
+   Name = "Infinite Jump",
+   CurrentValue = false,
+   Flag = "InfJumpToggle",
+   Callback = function(Value)
+      _G.InfJump = Value
+      if Value then
+         _G.InfJumpConn = UserInputService.JumpRequest:Connect(function()
+            if _G.InfJump then
+               local hum = getHumanoid()
+               if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+            end
+         end)
+      else
+         if _G.InfJumpConn then _G.InfJumpConn:Disconnect() end
+      end
+   end,
+})
+
+Tab4:CreateToggle({
+   Name = "Fly",
+   CurrentValue = false,
+   Flag = "FlyToggle",
+   Callback = function(Value)
+      _G.FlyEnabled = Value
+      local hrp = getHRP()
+      if not hrp then return end
+      if Value then
+         local bv = Instance.new("BodyVelocity")
+         bv.Name = "FlyBV"
+         bv.Velocity = Vector3.zero
+         bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+         bv.Parent = hrp
+         local bg = Instance.new("BodyGyro")
+         bg.Name = "FlyBG"
+         bg.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+         bg.P = 1e4
+         bg.Parent = hrp
+         local hum = getHumanoid()
+         if hum then hum.PlatformStand = true end
+         _G.FlyConn = RunService.RenderStepped:Connect(function()
+            if not _G.FlyEnabled then
+               local bvObj = hrp:FindFirstChild("FlyBV")
+               local bgObj = hrp:FindFirstChild("FlyBG")
+               if bvObj then bvObj:Destroy() end
+               if bgObj then bgObj:Destroy() end
+               local h = getHumanoid()
+               if h then h.PlatformStand = false end
+               _G.FlyConn:Disconnect()
+               return
+            end
+            local speed = _G.FlySpeed or 50
+            local cf = Camera.CFrame
+            local vel = Vector3.zero
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then vel += cf.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then vel -= cf.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then vel -= cf.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then vel += cf.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vel += Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then vel -= Vector3.new(0,1,0) end
+            if vel.Magnitude > 0 then vel = vel.Unit * speed end
+            bv.Velocity = vel
+            bg.CFrame = cf
+         end)
+      else
+         local bvObj = hrp:FindFirstChild("FlyBV")
+         local bgObj = hrp:FindFirstChild("FlyBG")
+         if bvObj then bvObj:Destroy() end
+         if bgObj then bgObj:Destroy() end
+         local hum = getHumanoid()
+         if hum then hum.PlatformStand = false end
+      end
+   end,
+})
+
+Tab4:CreateSlider({
+   Name = "Fly Speed",
+   Range = {10, 300},
+   Increment = 10,
+   Suffix = "Speed",
+   CurrentValue = 50,
+   Flag = "FlySpeed",
+   Callback = function(Value)
+      _G.FlySpeed = Value
+   end,
+})
+
+Tab4:CreateSlider({
    Name = "WalkSpeed",
    Range = {16, 500},
-   Increment = 10,
+   Increment = 2,
    Suffix = "Speed",
    CurrentValue = 16,
    Flag = "WalkSpeed",
    Callback = function(Value)
-      local character = LocalPlayer.Character
-      local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
-      if humanoid then humanoid.WalkSpeed = Value end
+      originalWalkSpeed = Value
+      local hum = getHumanoid()
+      if hum then hum.WalkSpeed = Value end
    end,
 })
 
-local Slider6 = Tab4:CreateSlider({
+Tab4:CreateSlider({
    Name = "Jump Power",
    Range = {50, 1000},
    Increment = 10,
@@ -429,57 +526,126 @@ local Slider6 = Tab4:CreateSlider({
    CurrentValue = 50,
    Flag = "JumpPower",
    Callback = function(Value)
-      local character = LocalPlayer.Character
-      local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
-      if humanoid then humanoid.JumpPower = Value end
+      originalJumpPower = Value
+      local hum = getHumanoid()
+      if hum then hum.JumpPower = Value end
    end,
 })
 
-local Button1 = Tab4:CreateButton({
-   Name = "Teleport to Closest Enemy",
+Tab4:CreateButton({
+   Name = "Teleport đến kẻ địch gần nhất",
    Callback = function()
       local closest = nil
       local closestDist = math.huge
-      local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+      local myHRP = getHRP()
       if not myHRP then return end
       for _, player in ipairs(Players:GetPlayers()) do
          if player ~= LocalPlayer and player.Character then
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                local dist = (hrp.Position - myHRP.Position).Magnitude
-               if dist < closestDist then
-                  closestDist = dist
-                  closest = hrp
-               end
+               if dist < closestDist then closestDist = dist closest = hrp end
             end
          end
       end
       if closest then
          myHRP.CFrame = closest.CFrame + Vector3.new(0, 3, 2)
-         Rayfield:Notify({ Title = "Teleported!", Content = "Teleported to nearest enemy.", Duration = 3, Image = "zap" })
+         Rayfield:Notify({ Title = "Teleported!", Content = "Đã teleport đến kẻ địch.", Duration = 3, Image = "zap" })
       end
    end,
 })
 
-local Button2 = Tab4:CreateButton({
-   Name = "Return to Spawn",
+Tab4:CreateButton({
+   Name = "Về Spawn",
    Callback = function()
-      if LocalPlayer.Character then
-         LocalPlayer.Character:MoveTo(Vector3.new(0, 10, 0))
+      local char = getCharacter()
+      if char then char:MoveTo(Vector3.new(0, 10, 0)) end
+   end,
+})
+
+RunService.Heartbeat:Connect(function()
+   if noclipEnabled and LocalPlayer.Character then
+      for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+         if part:IsA("BasePart") then part.CanCollide = false end
+      end
+   end
+   local hum = getHumanoid()
+   if hum then
+      if originalWalkSpeed ~= 16 and hum.WalkSpeed ~= originalWalkSpeed then
+         hum.WalkSpeed = originalWalkSpeed
+      end
+      if originalJumpPower ~= 50 and hum.JumpPower ~= originalJumpPower then
+         hum.JumpPower = originalJumpPower
+      end
+   end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+   local hum = char:WaitForChild("Humanoid")
+   task.wait(0.5)
+   hum.WalkSpeed = originalWalkSpeed
+   hum.JumpPower = originalJumpPower
+end)
+
+local Tab5 = Window:CreateTab("Anti-Cheat", "shield")
+
+Tab5:CreateToggle({
+   Name = "Anti-Kick",
+   CurrentValue = false,
+   Flag = "AntiKickToggle",
+   Callback = function(Value)
+      if Value then
+         local mt = getrawmetatable(game)
+         local oldNamecall = mt.__namecall
+         setreadonly(mt, false)
+         mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if method == "Kick" and self == LocalPlayer then
+               Rayfield:Notify({ Title = "Anti-Kick", Content = "Kick bị chặn!", Duration = 3, Image = "shield" })
+               return
+            end
+            return oldNamecall(self, ...)
+         end)
+         setreadonly(mt, true)
       end
    end,
 })
 
-Rayfield:Notify({
-   Title = "Welcome to Khanh's Hub",
-   Content = "PvP Mode Loaded! Use alt account to avoid ban.",
-   Duration = 6.5,
-   Image = "award"
+Tab5:CreateToggle({
+   Name = "Anti-Teleport",
+   CurrentValue = false,
+   Flag = "AntiTPToggle",
+   Callback = function(Value)
+      _G.AntiTP = Value
+      if Value then
+         _G.LastPos = getHRP() and getHRP().CFrame
+         _G.AntiTPConn = RunService.Heartbeat:Connect(function()
+            if not _G.AntiTP then _G.AntiTPConn:Disconnect() return end
+            local hrp = getHRP()
+            if hrp and _G.LastPos then
+               local dist = (hrp.Position - _G.LastPos.Position).Magnitude
+               if dist > 100 then
+                  hrp.CFrame = _G.LastPos
+                  Rayfield:Notify({ Title = "Anti-TP", Content = "Teleport bị chặn!", Duration = 3, Image = "shield" })
+               else
+                  _G.LastPos = hrp.CFrame
+               end
+            end
+         end)
+      else
+         if _G.AntiTPConn then _G.AntiTPConn:Disconnect() end
+      end
+   end,
 })
 
-Rayfield:Notify({
-   Title = "PvP Features Ready",
-   Content = "Aimbot, Silent Aim, ESP, Kill Aura, Hitbox, Noclip & more!",
-   Duration = 7,
-   Image = "sword"
-})
+Tab5:CreateToggle({
+   Name = "Anti-Stun",
+   CurrentValue = false,
+   Flag = "AntiStunToggle",
+   Callback = function(Value)
+      _G.AntiStun = Value
+      if Value then
+         _G.AntiStunConn = RunService.Heartbeat:Connect(function()
+            if not _G.AntiStun then _G.AntiStunConn:Disconnect() return end
+            local hum = getHumanoid()
+            if hum then
