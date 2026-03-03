@@ -1,228 +1,238 @@
--- Khanh's Blox Fruits Hub V4 - Fruit Tab Giống Banana Hub
-
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("Khanh's Blox Fruits Hub V4", "DarkTheme")
-
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local UserInputService = game:GetService("UserInputService")
-local StarterGui = game:GetService("StarterGui")
 
 local Player = Players.LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
-local CommF_ = Remotes:WaitForChild("CommF_")
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
 
-getgenv().Config = {
-    FruitSniper = false,
-    FruitESP = false,
-    FruitNotifier = false,
-    AutoStore = true,
-    BringFruit = false,
-    FruitFilter = "Mythical",
-    FlyEnabled = false,
-    FlySpeed = 100,
-    WalkSpeed = 16,
-    JumpPower = 50,
-    NoClip = false
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Khanh's Blox Fruits Hub v2026", "DarkTheme")
+
+local Teleports = {
+    ["Starter Island"] = CFrame.new(-8, 14, 854),
+    ["Jungle"] = CFrame.new(-1320, 5, 3815),
+    ["Pirate Village"] = CFrame.new(1075, 17, 14200),
+    ["Desert"] = CFrame.new(3040, 73, -9850),
+    ["Middle Town"] = CFrame.new(-636, 7, 4094),
+    ["Frozen Village"] = CFrame.new(1198, 16, 4401),
+    ["Skytown"] = CFrame.new(-7884, 5626, 600),
+    ["Marine Fortress"] = CFrame.new(3795, 44, 524),
+    ["Green Zone"] = CFrame.new(-2371, 73, -3218),
+    ["Haunted Castle"] = CFrame.new(-9474, 142, 5764),
+    ["Sea 1"] = CFrame.new(-2851, 36, 4494),
+    ["Sea 2"] = CFrame.new(-5075, 73, -250),
+    ["Sea 3"] = CFrame.new(-7912, 5607, 162),
+    ["Port Town"] = CFrame.new(-293, 44, 5400),
+    ["Hybrids"] = CFrame.new(-11646, 333, 6701),
+    ["Cursed Ship"] = CFrame.new(922, 133, 63940),
+    ["Floating Turtle"] = CFrame.new(-13234, 332, -7626),
+    ["Mansion"] = CFrame.new(-4990, 616, -272),
+    ["Prehistoric"] = CFrame.new(-5501, 101, 850),
+    ["Snow Mountain"] = CFrame.new(1386, 88, -12968),
+    ["Ice Castle"] = CFrame.new(6079, 50, -6860),
+    ["Forgotten Island"] = CFrame.new(-3054, 237, -10143),
+    ["Hot and Cold"] = CFrame.new(5713, 52, 1566),
+    ["Hydra Island"] = CFrame.new(5477, 60, 6830),
+    ["Castle on the Sea"] = CFrame.new(-5075, 73, -250),
+    ["Sea of Treats"] = CFrame.new(-7912, 5607, 162),
+    ["Temple of Time"] = CFrame.new(29645, 15000, 765),
+    ["Tiki Outpost"] = CFrame.new(-16000, 5600, 1000),
+    ["Great Tree"] = CFrame.new(1449, 89, -27),
+    ["Red Legacy"] = CFrame.new(-3200, 73, -9300)
 }
 
-local FruitRarity = {
-    Common = {"Bomb", "Spike", "Chop", "Smoke", "Spring"},
-    Uncommon = {"Flame", "Ice", "Sand", "Light", "Dark"},
-    Rare = {"Rubber", "Barrier", "Magma", "Falcon"},
-    Legendary = {"Venom", "Control", "Spirit", "Sound", "Blade"},
-    Mythical = {"Dragon", "Leopard", "Mammoth", "T-Rex", "Kitsune", "Dough"}
-}
+local Flying = false
+local Noclip = false
+local KillAura = false
+local ESPEnabled = false
+local AutoFarm = false
+local GodMode = false
+local SpeedValue = 16
+local JumpValue = 50
+local FlySpeed = 50
 
-local function GetRarity(fruitName)
-    fruitName = fruitName:gsub(" ", ""):lower()
-    for rarity, fruits in pairs(FruitRarity) do
-        for _, f in pairs(fruits) do
-            if fruitName:find(f:lower()) then return rarity end
+local function TweenToCFrame(cf)
+    local Tween = TweenService:Create(RootPart, TweenInfo.new(0.5, Enum.EasingStyle.Linear), {CFrame = cf})
+    Tween:Play()
+end
+
+local function GetNearestMob()
+    local dist = math.huge
+    local target = nil
+    for _, mob in pairs(Workspace.Enemies:GetChildren()) do
+        if mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+            local d = (RootPart.Position - mob.HumanoidRootPart.Position).Magnitude
+            if d < dist then dist = d; target = mob end
         end
     end
-    return "Common"
+    return target
 end
 
-local function IsGoodFruit(fruitName)
-    local rarity = GetRarity(fruitName)
-    return getgenv().Config.FruitFilter == "All" or rarity == getgenv().Config.FruitFilter
-end
-
-local function Teleport(cf)
-    pcall(function() HumanoidRootPart.CFrame = cf * CFrame.new(0,5,0) end)
-end
-
-local function PickupFruit(fruit)
-    if fruit and fruit:FindFirstChild("Handle") and fruit.Handle:FindFirstChild("ClickDetector") then
-        Teleport(fruit.Handle.CFrame)
-        fireclickdetector(fruit.Handle.ClickDetector)
-        if getgenv().Config.AutoStore and CommF_ then
-            CommF_:InvokeServer("StoreFruit", fruit.Name, "true")
+local function AttackMob(mob)
+    if mob then
+        TweenToCFrame(mob.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+        for _, tool in pairs(Player.Backpack:GetChildren()) do
+            if tool:IsA("Tool") then tool.Parent = Character; tool:Activate() end
         end
+    end
+end
+
+local function CreateESP(obj, text, color)
+    local Highlight = Instance.new("Highlight", obj)
+    Highlight.FillColor = color
+    Highlight.OutlineColor = color
+    Highlight.FillTransparency = 0.5
+    Highlight.OutlineTransparency = 0
+end
+
+local function HopServer()
+    local servers = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+    for _, v in pairs(servers.data) do
+        if v.playing < v.maxPlayers then TeleportService:TeleportToPlaceInstance(game.PlaceId, v.id) end
+    end
+end
+
+local function ToggleFly(state)
+    Flying = state
+    if Flying then
+        local BV = Instance.new("BodyVelocity")
+        BV.MaxForce = Vector3.new(4000,4000,4000)
+        BV.Velocity = Vector3.new(0,0,0)
+        BV.Parent = RootPart
+        local BG = Instance.new("BodyGyro")
+        BG.MaxTorque = Vector3.new(4000,4000,4000)
+        BG.CFrame = RootPart.CFrame
+        BG.Parent = RootPart
+        RunService.Heartbeat:Connect(function()
+            if Flying then
+                local cam = Workspace.CurrentCamera.CFrame
+                BV.Velocity = (cam.LookVector * FlySpeed) + Vector3.new(0, FlySpeed/2, 0)
+                BG.CFrame = cam
+            else
+                BV:Destroy()
+                BG:Destroy()
+            end
+        end)
     end
 end
 
 spawn(function()
-    while wait(0.5) do
-        if getgenv().Config.FruitSniper then
-            for _, obj in pairs(Workspace:GetChildren()) do
-                if obj:IsA("Tool") and obj.Name:find("Fruit") and IsGoodFruit(obj.Name) then
-                    PickupFruit(obj)
-                    break
-                end
+    while true do
+        if Noclip then
+            for _, part in pairs(Character:GetChildren()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
             end
         end
+        wait(0.1)
     end
 end)
 
-local FruitHighlights = {}
-spawn(function()
-    while wait() do
-        if getgenv().Config.FruitESP then
-            for _, obj in pairs(Workspace:GetChildren()) do
-                if obj:IsA("Tool") and obj.Name:find("Fruit") and not FruitHighlights[obj] then
-                    local highlight = Instance.new("Highlight", obj)
-                    highlight.FillColor = Color3.fromRGB(255, 255, 0)
-                    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
-                    FruitHighlights[obj] = highlight
-                end
-            end
-        else
-            for obj, h in pairs(FruitHighlights) do
-                if h then h:Destroy() end
-            end
-            FruitHighlights = {}
+local MainTab = Window:NewTab("🌟 Main")
+local MainSec = MainTab:NewSection("Auto Farm")
+
+MainSec:NewToggle("Auto Farm Level / Mastery", "Kill Aura + Hop", function(state)
+    AutoFarm = state
+    spawn(function()
+        while AutoFarm do
+            local mob = GetNearestMob()
+            if mob then AttackMob(mob) else HopServer() end
+            wait(0.2)
         end
-    end
-end)
-
-spawn(function()
-    while wait(1) do
-        if getgenv().Config.FruitNotifier then
-            for _, obj in pairs(Workspace:GetChildren()) do
-                if obj:IsA("Tool") and obj.Name:find("Fruit") then
-                    local rarity = GetRarity(obj.Name)
-                    if rarity == "Legendary" or rarity == "Mythical" then
-                        StarterGui:SetCore("SendNotification", {
-                            Title = "Rare Fruit Detected",
-                            Text = obj.Name .. " (" .. rarity .. ")",
-                            Duration = 5
-                        })
-                        local sound = Instance.new("Sound", Workspace)
-                        sound.SoundId = "rbxassetid://131961136"
-                        sound:Play()
-                        sound.Ended:Connect(function() sound:Destroy() end)
-                    end
-                end
-            end
-        end
-    end
-end)
-
-spawn(function()
-    while wait(2) do
-        if getgenv().Config.BringFruit then
-            for _, obj in pairs(Workspace:GetChildren()) do
-                if obj:IsA("Tool") and obj.Name:find("Fruit") then
-                    if obj:FindFirstChild("Handle") then
-                        obj.Handle.CFrame = HumanoidRootPart.CFrame * CFrame.new(0,0,-5)
-                    end
-                end
-            end
-        end
-    end
-end)
-
-local FruitTab = Window:NewTab("🍌 Fruit")
-local FruitSec = FruitTab:NewSection("Fruit Features")
-
-FruitSec:NewToggle("Fruit Sniper", "", function(s)
-    getgenv().Config.FruitSniper = s
-end)
-
-FruitSec:NewDropdown("Filter Rarity", "", {"All", "Common", "Uncommon", "Rare", "Legendary", "Mythical"}, function(s)
-    getgenv().Config.FruitFilter = s
-end)
-
-FruitSec:NewToggle("Fruit ESP", "", function(s)
-    getgenv().Config.FruitESP = s
-end)
-
-FruitSec:NewToggle("Notifier Legendary/Mythical", "", function(s)
-    getgenv().Config.FruitNotifier = s
-end)
-
-FruitSec:NewToggle("Bring All Fruits", "", function(s)
-    getgenv().Config.BringFruit = s
-end)
-
-FruitSec:NewToggle("Auto Store", "", function(s)
-    getgenv().Config.AutoStore = s
-end)
-
-FruitSec:NewButton("TP Nearest Fruit", "", function()
-    local nearest, dist = nil, math.huge
-    for _, obj in pairs(Workspace:GetChildren()) do
-        if obj:IsA("Tool") and obj.Name:find("Fruit") then
-            local d = (HumanoidRootPart.Position - obj.Handle.Position).Magnitude
-            if d < dist then nearest = obj.Handle.CFrame; dist = d end
-        end
-    end
-    if nearest then Teleport(nearest) end
-end)
-
-local MiscTab = Window:NewTab("Misc")
-local MiscSec = MiscTab:NewSection("Movement")
-
-MiscSec:NewToggle("Fly", "", function(s)
-    getgenv().Config.FlyEnabled = s
-    local bg = Instance.new("BodyVelocity", HumanoidRootPart)
-    bg.MaxForce = Vector3.new(1e9,1e9,1e9)
-    bg.Velocity = Vector3.new()
-    local conn = RunService.Heartbeat:Connect(function()
-        if not getgenv().Config.FlyEnabled then
-            bg:Destroy()
-            conn:Disconnect()
-            return
-        end
-        local cam = Workspace.CurrentCamera.CFrame
-        bg.Velocity = cam.LookVector * getgenv().Config.FlySpeed
     end)
 end)
 
-MiscSec:NewSlider("Fly Speed", "", 500, 50, function(v) getgenv().Config.FlySpeed = v end)
-
-MiscSec:NewToggle("NoClip", "", function(s) getgenv().Config.NoClip = s end)
-
-spawn(function()
-    while wait() do
-        if getgenv().Config.NoClip and Character then
-            for _, p in pairs(Character:GetDescendants()) do
-                if p:IsA("BasePart") then p.CanCollide = false end
-            end
+MainSec:NewToggle("God Mode", "Infinite Health", function(state)
+    GodMode = state
+    spawn(function()
+        while GodMode do
+            Humanoid.MaxHealth = math.huge
+            Humanoid.Health = math.huge
+            wait(0.5)
         end
+    end)
+end)
+
+local MovementTab = Window:NewTab("🚀 Movement")
+local MoveSec = MovementTab:NewSection("Hacks")
+
+MoveSec:NewToggle("Fly", "Này fly mượt", function(state)
+    ToggleFly(state)
+end)
+
+MoveSec:NewSlider("Fly Speed", "0-200", 50, function(s)
+    FlySpeed = s
+end)
+
+MoveSec:NewSlider("Walk Speed", "16-500", 16, function(s)
+    SpeedValue = s
+    Humanoid.WalkSpeed = SpeedValue
+end)
+
+MoveSec:NewSlider("Jump Power", "50-500", 50, function(s)
+    JumpValue = s
+    Humanoid.JumpPower = JumpValue
+end)
+
+MoveSec:NewToggle("Infinite Jump", "Nhảy liên tục", function(state)
+    local inf = state
+    game:GetService("UserInputService").JumpRequest:Connect(function()
+        if inf then Humanoid:ChangeState("Jumping") end
+    end)
+end)
+
+MoveSec:NewToggle("Noclip", "Xuyên tường", function(state)
+    Noclip = state
+end)
+
+local TeleTab = Window:NewTab("📍 Teleport")
+local TeleSec = TeleTab:NewSection("Islands")
+
+TeleSec:NewDropdown("Select Island", "Teleport", (function()
+    local t = {}
+    for k in pairs(Teleports) do table.insert(t, k) end
+    return t
+end)(), function(selected)
+    TweenToCFrame(Teleports[selected])
+end)
+
+local CombatTab = Window:NewTab("⚔️ Combat")
+local CombatSec = CombatTab:NewSection("PvP/Farm")
+
+CombatSec:NewToggle("Kill Aura", "Auto kill gần", function(state)
+    KillAura = state
+    spawn(function()
+        while KillAura do
+            local mob = GetNearestMob()
+            if mob then AttackMob(mob) end
+            wait(0.1)
+        end
+    end)
+end)
+
+local MiscTab = Window:NewTab("🔧 Misc")
+local MiscSec = MiscTab:NewSection("Extras")
+
+MiscSec:NewToggle("ESP Fruits/Mobs", "Highlight", function(state)
+    ESPEnabled = state
+    for _, fruit in pairs(Workspace:GetChildren()) do
+        if fruit:IsA("Tool") then CreateESP(fruit, "Fruit", Color3.new(0,1,0)) end
+    end
+    for _, mob in pairs(Workspace.Enemies:GetChildren()) do
+        CreateESP(mob, "Mob", Color3.new(1,0,0))
     end
 end)
 
-MiscSec:NewSlider("Walk Speed", "", 500, 16, function(v)
-    getgenv().Config.WalkSpeed = v
-    pcall(function() Character.Humanoid.WalkSpeed = v end)
+MiscSec:NewButton("Fruit Sniper (Auto Get)", function()
+    for _, fruit in pairs(Workspace:GetChildren()) do
+        if fruit:IsA("Tool") then TweenToCFrame(fruit.Handle.CFrame) fireclickdetector(fruit.ClickDetector) end
+    end
 end)
 
-MiscSec:NewSlider("Jump Power", "", 500, 50, function(v)
-    getgenv().Config.JumpPower = v
-    pcall(function() Character.Humanoid.JumpPower = v end)
-end)
+MiscSec:NewButton("Server Hop", "Low ping + fruits", HopServer)
 
-Player.CharacterAdded:Connect(function(c)
-    Character = c
-    HumanoidRootPart = c:WaitForChild("HumanoidRootPart")
-end)
-
-Library:ToggleUI()
+MiscSec:NewButton("Rejoin", "Respawn safe", function() game:GetService("TeleportService"):Teleport(game.PlaceId) end)
