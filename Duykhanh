@@ -1,0 +1,215 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Khanh's Blox Fruits Hub", "DarkTheme")
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local CommF_ = ReplicatedStorage.Remotes.CommF_
+
+getgenv().Config = {
+    AutoFarmLevel = false,
+    AutoFarmBoss = false,
+    AutoFruitSniper = false,
+    FlyEnabled = false,
+    FlySpeed = 100,
+    WalkSpeed = 16,
+    JumpPower = 50,
+    Team = "Pirates"
+}
+
+CommF_:InvokeServer("SetTeam", getgenv().Config.Team)
+
+local QuestData = {
+    [1] = {QuestName = "BanditQuest1", QuestLevel = 1, QuestPos = CFrame.new(1059.32, 16.42, 1548.46), EnemyName = "Bandit"},
+    [2] = {QuestName = "MonkeyQuest", QuestLevel = 1, QuestPos = CFrame.new(-1604.99, 36.85, 149.30), EnemyName = "Monkey"},
+    [3] = {QuestName = "PirateQuest1", QuestLevel = 1, QuestPos = CFrame.new(-305.12, 73.02, 437.43), EnemyName = "Pirate"},
+    [4] = {QuestName = "UsoppQuest1", QuestLevel = 1, QuestPos = CFrame.new(2410.09, 16.78, 239.21), EnemyName = "Dog"},
+    [5] = {QuestName = "SandQuest1", QuestLevel = 1, QuestPos = CFrame.new(1032.04, 16.20, 3863.70), EnemyName = "Desert Bandit"},
+    [6] = {QuestName = "SnowQuest1", QuestLevel = 1, QuestPos = CFrame.new(1384.14, 87.27, -1297.06), EnemyName = "Snow Bandit"},
+    [7] = {QuestName = "MarineQuest1", QuestLevel = 1, QuestPos = CFrame.new(2137.51, 26.62, -6919.74), EnemyName = "Chief Petty Officer"},
+    [8] = {QuestName = "Area1Quest1", QuestLevel = 1, QuestPos = CFrame.new(2857, 443, -9993), EnemyName = "Raider"},
+    [9] = {QuestName = "Area2Quest1", QuestLevel = 1, QuestPos = CFrame.new(-5437, 314, -2909), EnemyName = "Swan Pirate"},
+    [10] = {QuestName = "PortTownQuest", QuestLevel = 1, QuestPos = CFrame.new(-290, 44, 5355), EnemyName = "Pirate Millionaire"}
+}
+
+local function GetQuestInfo()
+    local level = Player.Data.Level.Value
+    if level < 15 then return QuestData[1]
+    elseif level < 30 then return QuestData[2]
+    elseif level < 40 then return QuestData[3]
+    elseif level < 60 then return QuestData[4]
+    elseif level < 90 then return QuestData[5]
+    elseif level < 120 then return QuestData[6]
+    elseif level < 150 then return QuestData[7]
+    elseif level < 700 then return QuestData[8]
+    else return QuestData[10] end
+end
+
+local function TeleportTo(cf)
+    if Character and HumanoidRootPart then
+        HumanoidRootPart.CFrame = cf * CFrame.new(0, 5, 0)
+    end
+end
+
+local function AttackEnemy(enemy)
+    if enemy and enemy:FindFirstChild("HumanoidRootPart") and enemy.Humanoid.Health > 0 then
+        TeleportTo(enemy.HumanoidRootPart.CFrame)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+        wait(0.1)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+    end
+end
+
+local function GetClosestEnemy(name)
+    local closest, dist = nil, math.huge
+    for _, e in pairs(Workspace.Enemies:GetChildren()) do
+        if e.Name == name and e:FindFirstChild("Humanoid") and e.Humanoid.Health > 0 then
+            local d = (HumanoidRootPart.Position - e.HumanoidRootPart.Position).Magnitude
+            if d < dist then closest, dist = e, d end
+        end
+    end
+    return closest
+end
+
+local FarmTab = Window:NewTab("Auto Farm")
+local FarmSection = FarmTab:NewSection("Farm")
+
+FarmSection:NewToggle("Auto Farm Level", "", function(s)
+    getgenv().Config.AutoFarmLevel = s
+    spawn(function()
+        while getgenv().Config.AutoFarmLevel do
+            pcall(function()
+                local q = GetQuestInfo()
+                if q then
+                    TeleportTo(q.QuestPos)
+                    wait(1)
+                    CommF_:InvokeServer("StartQuest", q.QuestName, q.QuestLevel)
+                    while getgenv().Config.AutoFarmLevel do
+                        local e = GetClosestEnemy(q.EnemyName)
+                        if e then
+                            AttackEnemy(e)
+                            wait(0.3)
+                        else break end
+                    end
+                end
+            end)
+            wait(2)
+        end
+    end)
+end)
+
+FarmSection:NewToggle("Auto Farm Boss", "", function(s)
+    getgenv().Config.AutoFarmBoss = s
+    spawn(function()
+        while getgenv().Config.AutoFarmBoss do
+            pcall(function()
+                for _, boss in pairs({"The Gorilla King", "Yeti", "Vice Admiral"}) do
+                    local b = Workspace.Enemies:FindFirstChild(boss)
+                    if b and b.Humanoid.Health > 0 then
+                        TeleportTo(b.HumanoidRootPart.CFrame)
+                        repeat
+                            AttackEnemy(b)
+                            wait(0.5)
+                        until b.Humanoid.Health <= 0 or not getgenv().Config.AutoFarmBoss
+                        break
+                    end
+                end
+            end)
+            wait(5)
+        end
+    end)
+end)
+
+local MiscTab = Window:NewTab("Misc")
+local FruitSection = MiscTab:NewSection("Fruit")
+
+FruitSection:NewToggle("Auto Fruit Sniper", "", function(s)
+    getgenv().Config.AutoFruitSniper = s
+    spawn(function()
+        while getgenv().Config.AutoFruitSniper do
+            pcall(function()
+                for _, f in pairs(Workspace:GetChildren()) do
+                    if f:IsA("Tool") and f.Name:find("Fruit") then
+                        TeleportTo(f.Handle.CFrame)
+                        wait(0.2)
+                        fireclickdetector(f:FindFirstChild("ClickDetector"))
+                        wait(0.5)
+                        CommF_:InvokeServer("StoreFruit", f.Name, "true")
+                    end
+                end
+            end)
+            wait(1)
+        end
+    end)
+end)
+
+local FlySection = MiscTab:NewSection("Movement")
+FlySection:NewToggle("Fly (Z)", "", function(s)
+    getgenv().Config.FlyEnabled = s
+    if s then
+        local bg = Instance.new("BodyVelocity", HumanoidRootPart)
+        bg.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bg.Velocity = Vector3.new()
+        repeat
+            bg.Velocity = Workspace.CurrentCamera.CFrame.LookVector * getgenv().Config.FlySpeed
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Z) then
+                getgenv().Config.FlyEnabled = false
+                break
+            end
+            wait()
+        until not getgenv().Config.FlyEnabled
+        bg:Destroy()
+    end
+end)
+
+FlySection:NewSlider("Fly Speed", "", 500, 1, function(v) getgenv().Config.FlySpeed = v end)
+FlySection:NewSlider("Walk Speed", "", 500, 16, function(v)
+    getgenv().Config.WalkSpeed = v
+    if Character:FindFirstChild("Humanoid") then Character.Humanoid.WalkSpeed = v end
+end)
+FlySection:NewSlider("Jump Power", "", 500, 50, function(v)
+    getgenv().Config.JumpPower = v
+    if Character:FindFirstChild("Humanoid") then Character.Humanoid.JumpPower = v end
+end)
+
+local TeleTab = Window:NewTab("Teleport")
+local TeleSection = TeleTab:NewSection("Islands")
+
+local locations = {
+    ["Sea 1"] = CFrame.new(0, 70, 0),
+    ["Jungle"] = CFrame.new(-1600, 37, 150),
+    ["Green Zone"] = CFrame.new(-2448, 73, -3210),
+    ["Sea 2"] = CFrame.new(-380, 77, -112),
+    ["Sea 3"] = CFrame.new(-290, 44, 5355)
+}
+
+for name, pos in pairs(locations) do
+    TeleSection:NewButton(name, "", function() TeleportTo(pos) end)
+end
+
+MiscTab:NewButton("No Clip", "", function()
+    local noclip = true
+    RunService.Stepped:Connect(function()
+        if noclip and Character then
+            for _, p in pairs(Character:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = false end
+            end
+        end
+    end)
+end)
+
+Player.CharacterAdded:Connect(function(c)
+    Character = c
+    HumanoidRootPart = c:WaitForChild("HumanoidRootPart")
+    c.Humanoid.WalkSpeed = getgenv().Config.WalkSpeed
+    c.Humanoid.JumpPower = getgenv().Config.JumpPower
+end)
+
+Library:ToggleUI()
+print("Loaded!")
