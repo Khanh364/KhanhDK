@@ -1,69 +1,104 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Khanh Hub - PvP God Mode",
+   Name = "Khanh Hub - ULTIMATE EDITION",
    Icon = "award",
-   LoadingTitle = "Skibidi DK",
-   LoadingSubtitle = "Phiên bản Mobile Pro",
+   LoadingTitle = "Skibidi DK - Full Power",
+   LoadingSubtitle = "Phiên bản Full Chức Năng",
    Theme = "Pear",
-   ConfigurationSaving = { Enabled = true, FolderName = "KhanhHub", FileName = "PvPConfig" }
+   ConfigurationSaving = { Enabled = true, FolderName = "KhanhHub", FileName = "FullConfig" }
 })
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local silentAimEnabled = false
 local killAuraEnabled = false
-local noclipEnabled = false
-local infJumpEnabled = false
+local fastAttackEnabled = false
 local noSlowdownEnabled = false
-local originalWalkSpeed = 16
-local originalJumpPower = 50
+local infJumpEnabled = false
+local noclipEnabled = false
+local antiStunEnabled = false
+local walkSpeed = 16
+local jumpPower = 50
 local silentAimFOV = 150
-local aimPart = "HumanoidRootPart"
 
-local function getCharacter() return LocalPlayer.Character end
-local function getHumanoid() return getCharacter() and getCharacter():FindFirstChildWhichIsA("Humanoid") end
-local function getHRP() return getCharacter() and getCharacter():FindFirstChild("HumanoidRootPart") end
+local function getChar() return LocalPlayer.Character end
+local function getHum() return getChar() and getChar():FindFirstChildWhichIsA("Humanoid") end
+local function getHRP() return getChar() and getChar():FindFirstChild("HumanoidRootPart") end
 
-local Tab1 = Window:CreateTab("Silent Aim", "crosshair")
+local Tab1 = Window:CreateTab("Bounty Hunter", "crosshair")
+
 Tab1:CreateToggle({
    Name = "Silent Aim (Ngắm ngầm)",
    CurrentValue = false,
    Callback = function(Value) silentAimEnabled = Value end,
 })
 
-Tab1:CreateSlider({
-   Name = "Tầm ngắm (FOV)",
-   Range = {50, 800},
-   Increment = 10,
-   CurrentValue = 150,
-   Callback = function(Value) silentAimFOV = Value end,
+Tab1:CreateToggle({
+   Name = "Fast Attack (Đánh siêu tốc)",
+   CurrentValue = false,
+   Callback = function(Value)
+      fastAttackEnabled = Value
+      task.spawn(function()
+         while fastAttackEnabled do
+            local tool = getChar() and getChar():FindFirstChildWhichIsA("Tool")
+            if tool then tool:Activate() end
+            task.wait(0.001)
+         end
+      end)
+   end,
+})
+
+Tab1:CreateButton({
+   Name = "Áp sát mục tiêu gần nhất",
+   Callback = function()
+      local target = nil
+      local dist = math.huge
+      for _, p in ipairs(Players:GetPlayers()) do
+         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local d = (p.Character.HumanoidRootPart.Position - getHRP().Position).Magnitude
+            if d < dist then dist = d target = p.Character end
+         end
+      end
+      if target then
+         getHRP().CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+      end
+   end,
 })
 
 local Tab2 = Window:CreateTab("Combat", "sword")
+
 Tab2:CreateToggle({
-   Name = "Kill Aura (Tự đánh)",
+   Name = "Kill Aura (Tầm xa)",
    CurrentValue = false,
    Callback = function(Value) killAuraEnabled = Value end,
 })
 
 Tab2:CreateToggle({
-   Name = "No Slowdown (Không bị chậm khi đánh)",
+   Name = "Anti-Stun (Chống choáng/khựng)",
+   CurrentValue = false,
+   Callback = function(Value) antiStunEnabled = Value end,
+})
+
+Tab2:CreateToggle({
+   Name = "No Slowdown (Không giảm tốc)",
    CurrentValue = false,
    Callback = function(Value) noSlowdownEnabled = Value end,
 })
 
 local Tab3 = Window:CreateTab("Movement", "zap")
+
 Tab3:CreateSlider({
    Name = "Tốc độ chạy",
    Range = {16, 500},
-   Increment = 2,
+   Increment = 5,
    CurrentValue = 16,
-   Callback = function(Value) originalWalkSpeed = Value end,
+   Callback = function(Value) walkSpeed = Value end,
 })
 
 Tab3:CreateSlider({
@@ -71,7 +106,7 @@ Tab3:CreateSlider({
    Range = {50, 1000},
    Increment = 10,
    CurrentValue = 50,
-   Callback = function(Value) originalJumpPower = Value end,
+   Callback = function(Value) jumpPower = Value end,
 })
 
 Tab3:CreateToggle({
@@ -88,43 +123,36 @@ Tab3:CreateToggle({
 
 UserInputService.JumpRequest:Connect(function()
    if infJumpEnabled then
-      local hum = getHumanoid()
-      if hum then 
-         hum:ChangeState(Enum.HumanoidStateType.Jumping) 
-      end
+      local hum = getHum()
+      if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
    end
 end)
 
 RunService.Heartbeat:Connect(function()
-   local char = getCharacter()
-   if not char then return end
-   local myHRP = getHRP()
+   local char = getChar()
+   if not char or not getHRP() then return end
    local tool = char:FindFirstChildWhichIsA("Tool")
    
    local target = nil
    local dist_f = silentAimFOV
    for _, p in ipairs(Players:GetPlayers()) do
-      if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(aimPart) then
-         local pos, onScreen = Camera:WorldToViewportPoint(p.Character[aimPart].Position)
+      if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+         local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
          if onScreen then
             local d = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-            if d < dist_f then 
-               dist_f = d 
-               target = p.Character 
-            end
+            if d < dist_f then dist_f = d target = p.Character end
          end
       end
    end
 
    if target and tool then
-      local tPart = target[aimPart]
-      local dist = (tPart.Position - myHRP.Position).Magnitude
+      local tHRP = target.HumanoidRootPart
+      local dist = (tHRP.Position - getHRP().Position).Magnitude
       
-      if (silentAimEnabled or killAuraEnabled) and dist <= 25 then
-         tool:Activate()
+      if (silentAimEnabled or killAuraEnabled) and dist <= 30 then
          for _, r in ipairs(tool:GetDescendants()) do
             if r:IsA("RemoteEvent") then
-               r:FireServer(tPart.Position)
+               r:FireServer(tHRP.Position)
                r:FireServer(target)
             end
          end
@@ -133,23 +161,26 @@ RunService.Heartbeat:Connect(function()
 end)
 
 RunService.Stepped:Connect(function()
-   local char = getCharacter()
+   local char = getChar()
    if not char then return end
    
    if noclipEnabled then
-      for _, part in ipairs(char:GetDescendants()) do
-         if part:IsA("BasePart") then part.CanCollide = false end
+      for _, p in ipairs(char:GetDescendants()) do
+         if p:IsA("BasePart") then p.CanCollide = false end
       end
    end
    
-   local hum = char:FindFirstChildWhichIsA("Humanoid")
+   local hum = getHum()
    if hum then
-      hum.WalkSpeed = originalWalkSpeed
+      hum.WalkSpeed = walkSpeed
+      hum.JumpPower = jumpPower
       hum.UseJumpPower = true
-      hum.JumpPower = originalJumpPower
       
-      if noSlowdownEnabled then
-         if hum.PlatformStand then hum.PlatformStand = false end
+      if antiStunEnabled or noSlowdownEnabled then
+         hum.PlatformStand = false
+         if hum:GetState() == Enum.HumanoidStateType.Ragdoll then
+            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+         end
       end
    end
 end)
@@ -157,6 +188,6 @@ end)
 Rayfield:Notify({
    Title = "Khanh Hub",
    Content = "Script Loaded!",
-   Duration = 5,
+   Duration = 6,
    Image = "award"
 })
