@@ -7,7 +7,7 @@ local Window = Rayfield:CreateWindow({
    LoadingSubtitle = "DK",
    ShowText = "Khanh Hub",
    Theme = "Pear",
-   ToggleUIKeybind = "DK",
+   ToggleUIKeybind = "K",
    DisableRayfieldPrompts = false,
    DisableBuildWarnings = false,
    ConfigurationSaving = {
@@ -39,7 +39,6 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local aimbotEnabled = false
-local silentAimEnabled = false
 local killAuraEnabled = false
 local espEnabled = false
 local autoParryEnabled = false
@@ -94,20 +93,11 @@ end
 local Tab1 = Window:CreateTab("Aimbot", "crosshair")
 
 Tab1:CreateToggle({
-   Name = "Aimbot (Tự động aim)",
+   Name = "Aimbot",
    CurrentValue = false,
    Flag = "AimbotToggle",
    Callback = function(Value)
       aimbotEnabled = Value
-   end,
-})
-
-Tab1:CreateToggle({
-   Name = "Silent Aim",
-   CurrentValue = false,
-   Flag = "SilentAimToggle",
-   Callback = function(Value)
-      silentAimEnabled = Value
    end,
 })
 
@@ -210,7 +200,11 @@ Tab2:CreateToggle({
          if player ~= LocalPlayer and player.Character then
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
-               hrp.Size = Value and Vector3.new(hitboxSize, hitboxSize, hitboxSize) or Vector3.new(2, 2, 1)
+               if Value then
+                  hrp.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+               else
+                  hrp.Size = Vector3.new(2, 2, 1)
+               end
             end
          end
       end
@@ -237,13 +231,16 @@ Tab2:CreateToggle({
       autoParryEnabled = Value
       if Value then
          _G.AutoParryConn = RunService.Heartbeat:Connect(function()
-            if not autoParryEnabled then _G.AutoParryConn:Disconnect() return end
+            if not autoParryEnabled then
+               _G.AutoParryConn:Disconnect()
+               return
+            end
             for _, player in ipairs(Players:GetPlayers()) do
                if player ~= LocalPlayer and player.Character then
                   local hrp = player.Character:FindFirstChild("HumanoidRootPart")
                   local myHRP = getHRP()
                   if hrp and myHRP and (hrp.Position - myHRP.Position).Magnitude < 15 then
-                     fireclickdetector(hrp)
+                     pcall(function() fireclickdetector(hrp) end)
                   end
                end
             end
@@ -258,13 +255,52 @@ Tab2:CreateToggle({
    Flag = "AntiRagdollToggle",
    Callback = function(Value)
       if Value then
-         _G.AntiRagdollConn = LocalPlayer.Character and LocalPlayer.Character.DescendantAdded:Connect(function(obj)
-            if obj.Name == "RagdollConstraint" or obj:IsA("BallSocketConstraint") then
-               obj:Destroy()
+         local char = getCharacter()
+         if char then
+            _G.AntiRagdollConn = char.DescendantAdded:Connect(function(obj)
+               if obj.Name == "RagdollConstraint" or obj:IsA("BallSocketConstraint") then
+                  pcall(function() obj:Destroy() end)
+               end
+            end)
+         end
+      else
+         if _G.AntiRagdollConn then _G.AntiRagdollConn:Disconnect() end
+      end
+   end,
+})
+
+Tab2:CreateToggle({
+   Name = "Anti-Stun",
+   CurrentValue = false,
+   Flag = "AntiStunToggle",
+   Callback = function(Value)
+      _G.AntiStun = Value
+      if Value then
+         _G.AntiStunConn = RunService.Heartbeat:Connect(function()
+            if not _G.AntiStun then _G.AntiStunConn:Disconnect() return end
+            local hum = getHumanoid()
+            if hum then
+               local state = hum:GetState()
+               if state == Enum.HumanoidStateType.StrafingNoPhysics
+               or state == Enum.HumanoidStateType.FallingDown
+               or state == Enum.HumanoidStateType.Ragdoll then
+                  hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+               end
+               hum.AutoRotate = true
+               hum.PlatformStand = false
+            end
+            local char = getCharacter()
+            if char then
+               for _, obj in ipairs(char:GetDescendants()) do
+                  if obj:IsA("BallSocketConstraint") or obj.Name == "RagdollConstraint"
+                  or obj.Name == "StunEffect" or obj.Name == "Stun" then
+                     pcall(function() obj:Destroy() end)
+                  end
+               end
             end
          end)
       else
-         if _G.AntiRagdollConn then _G.AntiRagdollConn:Disconnect() end
+         if _G.AntiStunConn then _G.AntiStunConn:Disconnect() end
       end
    end,
 })
@@ -280,7 +316,9 @@ RunService.Heartbeat:Connect(function()
                   local tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
                   if tool and tool:FindFirstChild("Handle") then
                      local event = tool:FindFirstChild("RemoteEvent") or tool:FindFirstChild("RemoteFunction")
-                     if event then pcall(function() event:FireServer(hrp) end) end
+                     if event then
+                        pcall(function() event:FireServer(hrp) end)
+                     end
                   end
                end
             end
@@ -318,7 +356,10 @@ local function createESP(player)
    healthLabel.Parent = billboardGui
    espBoxes[player.Name] = {gui = billboardGui, healthLabel = healthLabel}
    local conn = RunService.Heartbeat:Connect(function()
-      if not espEnabled or not player.Character then billboardGui.Parent = nil return end
+      if not espEnabled or not player.Character then
+         billboardGui.Parent = nil
+         return
+      end
       local hrp = player.Character:FindFirstChild("HumanoidRootPart")
       local hum = player.Character:FindFirstChildWhichIsA("Humanoid")
       if hrp and hum then
@@ -332,12 +373,18 @@ local function createESP(player)
 end
 
 local function removeESP(player)
-   if espBoxes[player.Name] then espBoxes[player.Name].gui:Destroy() espBoxes[player.Name] = nil end
-   if espConnections[player.Name] then espConnections[player.Name]:Disconnect() espConnections[player.Name] = nil end
+   if espBoxes[player.Name] then
+      espBoxes[player.Name].gui:Destroy()
+      espBoxes[player.Name] = nil
+   end
+   if espConnections[player.Name] then
+      espConnections[player.Name]:Disconnect()
+      espConnections[player.Name] = nil
+   end
 end
 
 Tab3:CreateToggle({
-   Name = "Player ESP (Tên + HP + Khoảng cách)",
+   Name = "Player ESP",
    CurrentValue = false,
    Flag = "ESPToggle",
    Callback = function(Value)
@@ -346,16 +393,22 @@ Tab3:CreateToggle({
          for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer then createESP(player) end
          end
-         Players.PlayerAdded:Connect(function(player) if espEnabled then createESP(player) end end)
-         Players.PlayerRemoving:Connect(function(player) removeESP(player) end)
+         Players.PlayerAdded:Connect(function(player)
+            if espEnabled then createESP(player) end
+         end)
+         Players.PlayerRemoving:Connect(function(player)
+            removeESP(player)
+         end)
       else
-         for _, player in ipairs(Players:GetPlayers()) do removeESP(player) end
+         for _, player in ipairs(Players:GetPlayers()) do
+            removeESP(player)
+         end
       end
    end,
 })
 
 Tab3:CreateToggle({
-   Name = "Chams (Nhìn xuyên tường)",
+   Name = "Chams",
    CurrentValue = false,
    Flag = "ChamsToggle",
    Callback = function(Value)
@@ -380,7 +433,7 @@ Tab3:CreateToggle({
 })
 
 Tab3:CreateToggle({
-   Name = "Show Hitbox (Debug)",
+   Name = "Show Hitbox",
    CurrentValue = false,
    Flag = "ShowHitboxToggle",
    Callback = function(Value)
@@ -447,7 +500,7 @@ Tab4:CreateToggle({
       if Value then
          local bv = Instance.new("BodyVelocity")
          bv.Name = "FlyBV"
-         bv.Velocity = Vector3.zero
+         bv.Velocity = Vector3.new(0, 0, 0)
          bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
          bv.Parent = hrp
          local bg = Instance.new("BodyGyro")
@@ -470,13 +523,13 @@ Tab4:CreateToggle({
             end
             local speed = _G.FlySpeed or 50
             local cf = Camera.CFrame
-            local vel = Vector3.zero
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then vel += cf.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then vel -= cf.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then vel -= cf.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then vel += cf.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vel += Vector3.new(0,1,0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then vel -= Vector3.new(0,1,0) end
+            local vel = Vector3.new(0, 0, 0)
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then vel = vel + cf.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then vel = vel - cf.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then vel = vel - cf.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then vel = vel + cf.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vel = vel + Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then vel = vel - Vector3.new(0, 1, 0) end
             if vel.Magnitude > 0 then vel = vel.Unit * speed end
             bv.Velocity = vel
             bg.CFrame = cf
@@ -533,7 +586,7 @@ Tab4:CreateSlider({
 })
 
 Tab4:CreateButton({
-   Name = "Teleport đến kẻ địch gần nhất",
+   Name = "Teleport to Closest Enemy",
    Callback = function()
       local closest = nil
       local closestDist = math.huge
@@ -544,19 +597,22 @@ Tab4:CreateButton({
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                local dist = (hrp.Position - myHRP.Position).Magnitude
-               if dist < closestDist then closestDist = dist closest = hrp end
+               if dist < closestDist then
+                  closestDist = dist
+                  closest = hrp
+               end
             end
          end
       end
       if closest then
          myHRP.CFrame = closest.CFrame + Vector3.new(0, 3, 2)
-         Rayfield:Notify({ Title = "Teleported!", Content = "Đã teleport đến kẻ địch.", Duration = 3, Image = "zap" })
+         Rayfield:Notify({ Title = "Teleported!", Content = "Teleported to nearest enemy.", Duration = 3, Image = "zap" })
       end
    end,
 })
 
 Tab4:CreateButton({
-   Name = "Về Spawn",
+   Name = "Return to Spawn",
    Callback = function()
       local char = getCharacter()
       if char then char:MoveTo(Vector3.new(0, 10, 0)) end
@@ -587,65 +643,9 @@ LocalPlayer.CharacterAdded:Connect(function(char)
    hum.JumpPower = originalJumpPower
 end)
 
-local Tab5 = Window:CreateTab("Anti-Cheat", "shield")
-
-Tab5:CreateToggle({
-   Name = "Anti-Kick",
-   CurrentValue = false,
-   Flag = "AntiKickToggle",
-   Callback = function(Value)
-      if Value then
-         local mt = getrawmetatable(game)
-         local oldNamecall = mt.__namecall
-         setreadonly(mt, false)
-         mt.__namecall = newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            if method == "Kick" and self == LocalPlayer then
-               Rayfield:Notify({ Title = "Anti-Kick", Content = "Kick bị chặn!", Duration = 3, Image = "shield" })
-               return
-            end
-            return oldNamecall(self, ...)
-         end)
-         setreadonly(mt, true)
-      end
-   end,
+Rayfield:Notify({
+   Title = "Khanh Hub",
+   Content = "Loaded! Use alt account to avoid ban.",
+   Duration = 6.5,
+   Image = "award"
 })
-
-Tab5:CreateToggle({
-   Name = "Anti-Teleport",
-   CurrentValue = false,
-   Flag = "AntiTPToggle",
-   Callback = function(Value)
-      _G.AntiTP = Value
-      if Value then
-         _G.LastPos = getHRP() and getHRP().CFrame
-         _G.AntiTPConn = RunService.Heartbeat:Connect(function()
-            if not _G.AntiTP then _G.AntiTPConn:Disconnect() return end
-            local hrp = getHRP()
-            if hrp and _G.LastPos then
-               local dist = (hrp.Position - _G.LastPos.Position).Magnitude
-               if dist > 100 then
-                  hrp.CFrame = _G.LastPos
-                  Rayfield:Notify({ Title = "Anti-TP", Content = "Teleport bị chặn!", Duration = 3, Image = "shield" })
-               else
-                  _G.LastPos = hrp.CFrame
-               end
-            end
-         end)
-      else
-         if _G.AntiTPConn then _G.AntiTPConn:Disconnect() end
-      end
-   end,
-})
-
-Tab5:CreateToggle({
-   Name = "Anti-Stun",
-   CurrentValue = false,
-   Flag = "AntiStunToggle",
-   Callback = function(Value)
-      _G.AntiStun = Value
-      if Value then
-         _G.AntiStunConn = RunService.Heartbeat:Connect(function()
-            if not _G.AntiStun then _G.AntiStunConn:Disconnect() return end
-            local hum = getHumanoid()
-            if hum then
