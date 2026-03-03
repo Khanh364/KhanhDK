@@ -1,8 +1,7 @@
--- Khanh's Blox Fruits Hub - Hoàn Thiện (Toggle Menu: Right Shift)
--- Fly Fix, NoClip Toggle, Full QuestData Sea1-3, Auto Mastery, ESP
+-- Khanh's Blox Fruits Hub V4 - Fruit Tab Giống Banana Hub
 
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("Khanh's Blox Fruits Hub V2", "DarkTheme")
+local Window = Library.CreateLib("Khanh's Blox Fruits Hub V4", "DarkTheme")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,256 +9,220 @@ local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
 
 local Player = Players.LocalPlayer
-local Character = Player.CharacterAdded:Wait()
+local Character = Player.Character or Player.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-local CommF_ = ReplicatedStorage.Remotes.CommF_
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local CommF_ = Remotes:WaitForChild("CommF_")
 
 getgenv().Config = {
-    AutoFarmLevel = false,
-    AutoFarmBoss = false,
-    AutoFruitSniper = false,
-    AutoMastery = false,
-    NoClip = false,
-    ESP = false,
+    FruitSniper = false,
+    FruitESP = false,
+    FruitNotifier = false,
+    AutoStore = true,
+    BringFruit = false,
+    FruitFilter = "Mythical",
     FlyEnabled = false,
     FlySpeed = 100,
     WalkSpeed = 16,
     JumpPower = 50,
-    Team = "Pirates"
+    NoClip = false
 }
 
-CommF_:InvokeServer("SetTeam", getgenv().Config.Team)
-
--- Full QuestData (Sea 1-3, 50+ Quests)
-local QuestData = {
-    {Min=0, Max=9, QuestName="BanditQuest1", QuestLevel=1, EnemyName="Bandit [Lv. 5]", QuestPos=CFrame.new(1059.32, 16.42, 1548.46), EnemyPos=CFrame.new(1199.31, 16.42, 1546.52)},
-    {Min=10, Max=14, QuestName="MonkeyQuest", QuestLevel=1, EnemyName="Monkey [Lv. 14]", QuestPos=CFrame.new(-1604.99, 36.85, 149.30), EnemyPos=CFrame.new(-1501.51, 24.25, 263.22)},
-    {Min=15, Max=29, QuestName="PirateQuest1", QuestLevel=1, EnemyName="Pirate [Lv. 15]", QuestPos=CFrame.new(-324.406, 73, 402.317), EnemyPos=CFrame.new(-375.221, 73.0143, 415.851)},
-    {Min=30, Max=39, QuestName="UsoppQuest1", QuestLevel=1, EnemyName="Dog [Lv. 30]", QuestPos=CFrame.new(2441.95, 16.78, 237.446), EnemyPos=CFrame.new(2237.65, 16.78, 385.11)},
-    {Min=40, Max=59, QuestName="SandQuest1", QuestLevel=1, EnemyName="Desert Bandit [Lv. 45]", QuestPos=CFrame.new(1032.04, 16.2, 3863.7), EnemyPos=CFrame.new(924.33, 16.2, 4338.49)},
-    {Min=60, Max=79, QuestName="SnowQuest1", QuestLevel=1, EnemyName="Snow Bandit [Lv. 65]", QuestPos=CFrame.new(1384.14, 87.27, -1297.11), EnemyPos=CFrame.new(1340.99, 87.27, -1255.58)},
-    {Min=80, Max=89, QuestName="MarineQuest1", QuestLevel=1, EnemyName="Chief Petty Officer [Lv. 85]", QuestPos=CFrame.new(2137.51, 26.62, -6919.74), EnemyPos=CFrame.new(2200.52, 26.62, -7101.18)},
-    {Min=90, Max=99, QuestName="SnowQuest2", QuestLevel=2, EnemyName="Snow Trooper [Lv. 95]", QuestPos=CFrame.new(1384.14, 87.27, -1297.11), EnemyPos=CFrame.new(1369.83, 87.2728, -1229.59)},
-    {Min=100, Max=119, QuestName="MarineQuest2", QuestLevel=2, EnemyName="Chief Petty Officer [Lv. 105]", QuestPos=CFrame.new(2197.29, 27.92, -6869.23), EnemyPos=CFrame.new(2180.97, 27.9135, -7066.18)},
-    {Min=120, Max=149, QuestName="MarineQuest3", QuestLevel=3, EnemyName="Seaman [Lv. 125]", QuestPos=CFrame.new(2180.54, 27.77, -6863.6), EnemyPos=CFrame.new(2133.23, 27.7738, -6998.34)},
-    -- Sea 2 Start
-    {Min=450, Max=474, QuestName="Area1Quest1", QuestLevel=1, EnemyName="Raider [Lv. 450]", QuestPos=CFrame.new(2857, 443, -9993), EnemyPos=CFrame.new(2777, 414, -9944)},
-    {Min=475, Max=524, QuestName="Area1Quest2", QuestLevel=2, EnemyName="Raider [Lv. 475]", QuestPos=CFrame.new(2857, 443, -9993), EnemyPos=CFrame.new(2777, 414, -9944)},
-    {Min=525, Max=599, QuestName="Area2Quest1", QuestLevel=1, EnemyName="Swan Pirate [Lv. 525]", QuestPos=CFrame.new(-5437, 314, -2909), EnemyPos=CFrame.new(-5520, 314, -2727)},
-    -- Thêm nhiều hơn cho full (copy format để edit)
-    {Min=600, Max=649, QuestName="KiloQuest1", QuestLevel=1, EnemyName="Pirate Millionaire [Lv. 600]", QuestPos=CFrame.new(6196, 394, -1308), EnemyPos=CFrame.new(6290, 383, -1286)},
-    {Min=650, Max=699, QuestName="KiloQuest2", QuestLevel=2, EnemyName="Pistol Billionaire [Lv. 650]", QuestPos=CFrame.new(6196, 394, -1308), EnemyPos=CFrame.new(6290, 383, -1286)},
-    -- Sea 3
-    {Min=1800, Max=1824, QuestName="PortTownQuest1", QuestLevel=1, EnemyName="Pirate Millionaire [Lv. 1800]", QuestPos=CFrame.new(-290, 44, 5355), EnemyPos=CFrame.new(-320, 44, 5560)},
-    -- ... Thêm full nếu cần (tìm CFrame in-game bằng F3X)
+local FruitRarity = {
+    Common = {"Bomb", "Spike", "Chop", "Smoke", "Spring"},
+    Uncommon = {"Flame", "Ice", "Sand", "Light", "Dark"},
+    Rare = {"Rubber", "Barrier", "Magma", "Falcon"},
+    Legendary = {"Venom", "Control", "Spirit", "Sound", "Blade"},
+    Mythical = {"Dragon", "Leopard", "Mammoth", "T-Rex", "Kitsune", "Dough"}
 }
 
-local function GetQuestInfo()
-    local level = Player:FindFirstChild("Data") and Player.Data:FindFirstChild("Level") and Player.Data.Level.Value or 1
-    for _, q in pairs(QuestData) do
-        if level >= q.Min and level <= q.Max then return q end
-    end
-    return QuestData[1] -- Default
-end
-
-local function TeleportTo(cf)
-    pcall(function()
-        HumanoidRootPart.CFrame = cf * CFrame.new(0, 5, 0)
-    end)
-end
-
-local function AttackEnemy(enemy)
-    pcall(function()
-        if enemy and enemy:FindFirstChild("HumanoidRootPart") and enemy.Humanoid.Health > 0 then
-            TeleportTo(enemy.HumanoidRootPart.CFrame * CFrame.new(0,10,0))
-            VirtualInputManager:SendMouseButtonEvent(0,0,0,true,game,1); wait(0.1); VirtualInputManager:SendMouseButtonEvent(0,0,0,false,game,1)
-        end
-    end)
-end
-
-local function GetClosestEnemy(name)
-    local closest, dist = nil, math.huge
-    for _, e in pairs(Workspace.Enemies:GetChildren()) do
-        if e.Name == name and e:FindFirstChild("Humanoid") and e.Humanoid.Health > 0 then
-            local d = (HumanoidRootPart.Position - e.HumanoidRootPart.Position).Magnitude
-            if d < dist then closest = e; dist = d end
+local function GetRarity(fruitName)
+    fruitName = fruitName:gsub(" ", ""):lower()
+    for rarity, fruits in pairs(FruitRarity) do
+        for _, f in pairs(fruits) do
+            if fruitName:find(f:lower()) then return rarity end
         end
     end
-    return closest
+    return "Common"
 end
 
--- NoClip Toggle
-local NoClipConnection
-getgenv().Config.NoClip = false
-RunService.Stepped:Connect(function()
-    if getgenv().Config.NoClip and Character then
-        for _, part in pairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
+local function IsGoodFruit(fruitName)
+    local rarity = GetRarity(fruitName)
+    return getgenv().Config.FruitFilter == "All" or rarity == getgenv().Config.FruitFilter
+end
+
+local function Teleport(cf)
+    pcall(function() HumanoidRootPart.CFrame = cf * CFrame.new(0,5,0) end)
+end
+
+local function PickupFruit(fruit)
+    if fruit and fruit:FindFirstChild("Handle") and fruit.Handle:FindFirstChild("ClickDetector") then
+        Teleport(fruit.Handle.CFrame)
+        fireclickdetector(fruit.Handle.ClickDetector)
+        if getgenv().Config.AutoStore and CommF_ then
+            CommF_:InvokeServer("StoreFruit", fruit.Name, "true")
         end
     end
-end)
+end
 
--- Farm Tab
-local FarmTab = Window:NewTab("Auto Farm")
-local FarmSection = FarmTab:NewSection("Main Farm")
-
-FarmSection:NewToggle("Auto Farm Level/Quest", "", function(s)
-    getgenv().Config.AutoFarmLevel = s
-    spawn(function()
-        while getgenv().Config.AutoFarmLevel do
-            pcall(function()
-                local q = GetQuestInfo()
-                TeleportTo(q.QuestPos)
-                wait(1)
-                CommF_:InvokeServer("StartQuest", q.QuestName, q.QuestLevel)
-                repeat wait(0.5) until not Player.PlayerGui.Main.Quest.Visible -- Wait quest complete
-                while getgenv().Config.AutoFarmLevel do
-                    local e = GetClosestEnemy(q.EnemyName)
-                    if e then AttackEnemy(e); wait(0.3) else break end
-                end
-            end)
-            wait(2)
-        end
-    end)
-end)
-
-FarmSection:NewToggle("Auto Farm Mastery", "", function(s)
-    getgenv().Config.AutoMastery = s
-    spawn(function()
-        while getgenv().Config.AutoMastery do
-            CommF_:InvokeServer("BuyHaki", "Observation")
-            wait(5)
-        end
-    end)
-end)
-
--- Misc Tab
-local MiscTab = Window:NewTab("Misc")
-local FruitSection = MiscTab:NewSection("Fruit & Movement")
-
-FruitSection:NewToggle("Auto Fruit Sniper/Store", "", function(s)
-    getgenv().Config.AutoFruitSniper = s
-    spawn(function()
-        while getgenv().Config.AutoFruitSniper do
-            for _, f in pairs(Workspace:GetChildren()) do
-                if f:IsA("Tool") and f.Name:find("Fruit") then
-                    TeleportTo(f.Handle.CFrame)
-                    fireclickdetector(f.ClickDetector)
-                    CommF_:InvokeServer("StoreFruit", f.Name, "true")
+spawn(function()
+    while wait(0.5) do
+        if getgenv().Config.FruitSniper then
+            for _, obj in pairs(Workspace:GetChildren()) do
+                if obj:IsA("Tool") and obj.Name:find("Fruit") and IsGoodFruit(obj.Name) then
+                    PickupFruit(obj)
                     break
                 end
             end
-            wait(1)
         end
-    end)
-end)
-
-local flyConn, bg
-FruitSection:NewToggle("Fly (Toggle)", "", function(s)
-    getgenv().Config.FlyEnabled = s
-    if s then
-        bg = Instance.new("BodyVelocity")
-        bg.MaxForce = Vector3.new(4000,4000,4000)
-        bg.Velocity = Vector3.new()
-        bg.Parent = HumanoidRootPart
-        flyConn = RunService.Heartbeat:Connect(function()
-            if getgenv().Config.FlyEnabled then
-                local cam = Workspace.CurrentCamera
-                bg.Velocity = (cam.CFrame.LookVector * Vector3.new(1,0,1)).Unit * getgenv().Config.FlySpeed + Vector3.new(0, UserInputService:IsKeyDown(Enum.KeyCode.Space) and 50 or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and -50 or 0, 0)
-            else
-                flyConn:Disconnect()
-                if bg then bg:Destroy() end
-            end
-        end)
-    else
-        if flyConn then flyConn:Disconnect() end
-        if bg then bg:Destroy() end
     end
 end)
 
-FruitSection:NewSlider("Fly Speed", "", 500, 50, function(v) getgenv().Config.FlySpeed = v end)
+local FruitHighlights = {}
+spawn(function()
+    while wait() do
+        if getgenv().Config.FruitESP then
+            for _, obj in pairs(Workspace:GetChildren()) do
+                if obj:IsA("Tool") and obj.Name:find("Fruit") and not FruitHighlights[obj] then
+                    local highlight = Instance.new("Highlight", obj)
+                    highlight.FillColor = Color3.fromRGB(255, 255, 0)
+                    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+                    FruitHighlights[obj] = highlight
+                end
+            end
+        else
+            for obj, h in pairs(FruitHighlights) do
+                if h then h:Destroy() end
+            end
+            FruitHighlights = {}
+        end
+    end
+end)
 
-FruitSection:NewToggle("No Clip", "", function(s) getgenv().Config.NoClip = s end)
+spawn(function()
+    while wait(1) do
+        if getgenv().Config.FruitNotifier then
+            for _, obj in pairs(Workspace:GetChildren()) do
+                if obj:IsA("Tool") and obj.Name:find("Fruit") then
+                    local rarity = GetRarity(obj.Name)
+                    if rarity == "Legendary" or rarity == "Mythical" then
+                        StarterGui:SetCore("SendNotification", {
+                            Title = "Rare Fruit Detected",
+                            Text = obj.Name .. " (" .. rarity .. ")",
+                            Duration = 5
+                        })
+                        local sound = Instance.new("Sound", Workspace)
+                        sound.SoundId = "rbxassetid://131961136"
+                        sound:Play()
+                        sound.Ended:Connect(function() sound:Destroy() end)
+                    end
+                end
+            end
+        end
+    end
+end)
 
-FruitSection:NewSlider("Walk Speed", "", 500, 16, function(v)
+spawn(function()
+    while wait(2) do
+        if getgenv().Config.BringFruit then
+            for _, obj in pairs(Workspace:GetChildren()) do
+                if obj:IsA("Tool") and obj.Name:find("Fruit") then
+                    if obj:FindFirstChild("Handle") then
+                        obj.Handle.CFrame = HumanoidRootPart.CFrame * CFrame.new(0,0,-5)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local FruitTab = Window:NewTab("🍌 Fruit")
+local FruitSec = FruitTab:NewSection("Fruit Features")
+
+FruitSec:NewToggle("Fruit Sniper", "", function(s)
+    getgenv().Config.FruitSniper = s
+end)
+
+FruitSec:NewDropdown("Filter Rarity", "", {"All", "Common", "Uncommon", "Rare", "Legendary", "Mythical"}, function(s)
+    getgenv().Config.FruitFilter = s
+end)
+
+FruitSec:NewToggle("Fruit ESP", "", function(s)
+    getgenv().Config.FruitESP = s
+end)
+
+FruitSec:NewToggle("Notifier Legendary/Mythical", "", function(s)
+    getgenv().Config.FruitNotifier = s
+end)
+
+FruitSec:NewToggle("Bring All Fruits", "", function(s)
+    getgenv().Config.BringFruit = s
+end)
+
+FruitSec:NewToggle("Auto Store", "", function(s)
+    getgenv().Config.AutoStore = s
+end)
+
+FruitSec:NewButton("TP Nearest Fruit", "", function()
+    local nearest, dist = nil, math.huge
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if obj:IsA("Tool") and obj.Name:find("Fruit") then
+            local d = (HumanoidRootPart.Position - obj.Handle.Position).Magnitude
+            if d < dist then nearest = obj.Handle.CFrame; dist = d end
+        end
+    end
+    if nearest then Teleport(nearest) end
+end)
+
+local MiscTab = Window:NewTab("Misc")
+local MiscSec = MiscTab:NewSection("Movement")
+
+MiscSec:NewToggle("Fly", "", function(s)
+    getgenv().Config.FlyEnabled = s
+    local bg = Instance.new("BodyVelocity", HumanoidRootPart)
+    bg.MaxForce = Vector3.new(1e9,1e9,1e9)
+    bg.Velocity = Vector3.new()
+    local conn = RunService.Heartbeat:Connect(function()
+        if not getgenv().Config.FlyEnabled then
+            bg:Destroy()
+            conn:Disconnect()
+            return
+        end
+        local cam = Workspace.CurrentCamera.CFrame
+        bg.Velocity = cam.LookVector * getgenv().Config.FlySpeed
+    end)
+end)
+
+MiscSec:NewSlider("Fly Speed", "", 500, 50, function(v) getgenv().Config.FlySpeed = v end)
+
+MiscSec:NewToggle("NoClip", "", function(s) getgenv().Config.NoClip = s end)
+
+spawn(function()
+    while wait() do
+        if getgenv().Config.NoClip and Character then
+            for _, p in pairs(Character:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = false end
+            end
+        end
+    end
+end)
+
+MiscSec:NewSlider("Walk Speed", "", 500, 16, function(v)
     getgenv().Config.WalkSpeed = v
     pcall(function() Character.Humanoid.WalkSpeed = v end)
 end)
 
-FruitSection:NewSlider("Jump Power", "", 500, 50, function(v)
+MiscSec:NewSlider("Jump Power", "", 500, 50, function(v)
     getgenv().Config.JumpPower = v
     pcall(function() Character.Humanoid.JumpPower = v end)
 end)
 
--- ESP Toggle
-local ESPSection = MiscTab:NewSection("ESP")
-ESPSection:NewToggle("Enemy ESP", "", function(s)
-    getgenv().Config.ESP = s
-    if s then
-        for _, enemy in pairs(Workspace.Enemies:GetChildren()) do
-            local h = Instance.new("Highlight", enemy)
-            h.FillColor = Color3.new(1,0,0)
-            h.OutlineColor = Color3.new(1,1,1)
-        end
-        Workspace.Enemies.ChildAdded:Connect(function(enemy)
-            if getgenv().Config.ESP then
-                local h = Instance.new("Highlight", enemy)
-                h.FillColor = Color3.new(1,0,0)
-            end
-        end)
-    else
-        for _, enemy in pairs(Workspace.Enemies:GetChildren()) do
-            if enemy:FindFirstChild("Highlight") then enemy.Highlight:Destroy() end
-        end
-    end
-end)
-
--- Teleport Tab (Full)
-local TeleTab = Window:NewTab("Teleport")
-local TeleSection = TeleTab:NewSection("Popular")
-
-local TPs = {
-    ["Spawn"] = CFrame.new(0,70,0),
-    ["Jungle"] = CFrame.new(-1600,37,150),
-    ["Green Zone"] = CFrame.new(-2448,73,-3210),
-    ["Sea 2 Cafe"] = CFrame.new(-380,77,-112),
-    ["Sea 3 Port"] = CFrame.new(-290,44,5355),
-    ["Race V4"] = CFrame.new(-12592,246,-9990)
-}
-for name, pos in pairs(TPs) do
-    TeleSection:NewButton(name, "", function() TeleportTo(pos) end)
-end
-
-TeleSection:NewButton("Toggle Menu (Right Shift)", "", function() Library:ToggleUI() end)
-
--- Boss Farm (simple)
-local BossSection = FarmTab:NewSection("Boss")
-BossSection:NewToggle("Auto Boss", "", function(s)
-    getgenv().Config.AutoFarmBoss = s
-    spawn(function()
-        while getgenv().Config.AutoFarmBoss do
-            for _, bossName in pairs({"Yeti", "Vice Admiral", "The Gorilla King", "The Saw"}) do -- Add more
-                local boss = Workspace.Enemies:FindFirstChild(bossName)
-                if boss and boss.Humanoid.Health > 0 then
-                    TeleportTo(boss.HumanoidRootPart.CFrame)
-                    repeat AttackEnemy(boss) wait(0.5) until boss.Humanoid.Health <= 0
-                end
-            end
-            wait(5)
-        end
-    end)
-end)
-
--- Character Update
 Player.CharacterAdded:Connect(function(c)
     Character = c
     HumanoidRootPart = c:WaitForChild("HumanoidRootPart")
-    c.Humanoid.WalkSpeed = getgenv().Config.WalkSpeed
-    c.Humanoid.JumpPower = getgenv().Config.JumpPower
 end)
 
 Library:ToggleUI()
-print("Khanh's Hub V2 Loaded! Right Shift để bật/tắt menu 🚀")
