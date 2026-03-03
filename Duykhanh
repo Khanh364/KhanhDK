@@ -1,10 +1,10 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Khanh's Blox Fruits Hub v2026",
+   Name = "Khanh",
    Icon = "award",
-   LoadingTitle = "Welcome",
-   LoadingSubtitle = "by Khanh",
+   LoadingTitle = "skibidi",
+   LoadingSubtitle = "DK",
    ShowText = "Khanh Hub",
    Theme = "Amethyst",
 
