@@ -1,220 +1,162 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Khanh Hub - Mobile Optimized",
+   Name = "Khanh Hub - PvP God Mode",
    Icon = "award",
    LoadingTitle = "Skibidi DK",
-   LoadingSubtitle = "Phiên bản Mobile",
+   LoadingSubtitle = "Phiên bản Mobile Pro",
    Theme = "Pear",
-   ToggleUIKeybind = "K",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = "KhanhHub",
-      FileName = "MobileConfig"
-   },
-   KeySystem = false
+   ConfigurationSaving = { Enabled = true, FolderName = "KhanhHub", FileName = "PvPConfig" }
 })
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local VIM = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Variables
-local aimbotEnabled = false
+local silentAimEnabled = false
 local killAuraEnabled = false
-local espEnabled = false
-local autoParryEnabled = false
 local noclipEnabled = false
-local autoSkillEnabled = false
-local aimbotPart = "Head"
-local aimbotFOV = 120
-local aimbotSmooth = 5
-local killAuraRange = 15
+local infJumpEnabled = false
+local noSlowdownEnabled = false
 local originalWalkSpeed = 16
 local originalJumpPower = 50
+local silentAimFOV = 150
+local aimPart = "HumanoidRootPart"
 
--- Helper Functions
 local function getCharacter() return LocalPlayer.Character end
 local function getHumanoid() return getCharacter() and getCharacter():FindFirstChildWhichIsA("Humanoid") end
 local function getHRP() return getCharacter() and getCharacter():FindFirstChild("HumanoidRootPart") end
 
--- Tab 1: Aimbot
-local Tab1 = Window:CreateTab("Aimbot", "crosshair")
+local Tab1 = Window:CreateTab("Silent Aim", "crosshair")
 Tab1:CreateToggle({
-   Name = "Aimbot (Auto Lock)",
+   Name = "Silent Aim (Ngắm ngầm)",
    CurrentValue = false,
-   Callback = function(Value) aimbotEnabled = Value end,
+   Callback = function(Value) silentAimEnabled = Value end,
 })
 
 Tab1:CreateSlider({
-   Name = "Aimbot Smoothness",
-   Range = {1, 20},
-   Increment = 1,
-   CurrentValue = 5,
-   Callback = function(Value) aimbotSmooth = Value end,
+   Name = "Tầm ngắm (FOV)",
+   Range = {50, 800},
+   Increment = 10,
+   CurrentValue = 150,
+   Callback = function(Value) silentAimFOV = Value end,
 })
 
--- Tab 2: Combat (Đã sửa lỗi)
 local Tab2 = Window:CreateTab("Combat", "sword")
-
 Tab2:CreateToggle({
    Name = "Kill Aura (Tự đánh)",
    CurrentValue = false,
    Callback = function(Value) killAuraEnabled = Value end,
 })
 
-Tab2:CreateSlider({
-   Name = "Tầm đánh (Range)",
-   Range = {5, 50},
-   Increment = 1,
-   CurrentValue = 15,
-   Callback = function(Value) killAuraRange = Value end,
-})
-
 Tab2:CreateToggle({
-   Name = "Auto Parry (Tự đỡ - Phím F)",
+   Name = "No Slowdown (Không bị chậm khi đánh)",
    CurrentValue = false,
-   Callback = function(Value) autoParryEnabled = Value end,
+   Callback = function(Value) noSlowdownEnabled = Value end,
 })
 
--- Tab 3: Mobile Skills (Dành riêng cho điện thoại)
-local Tab3 = Window:CreateTab("Mobile Skills", "smartphone")
-
-Tab3:CreateToggle({
-   Name = "Auto Spam Skills (Z, X, C, V)",
-   CurrentValue = false,
-   Callback = function(Value)
-      autoSkillEnabled = Value
-      if Value then
-         task.spawn(function()
-            while autoSkillEnabled do
-               local keys = {Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V}
-               for _, key in ipairs(keys) do
-                  if not autoSkillEnabled then break end
-                  VIM:SendKeyEvent(true, key, false, game)
-                  task.wait(0.05)
-                  VIM:SendKeyEvent(false, key, false, game)
-                  task.wait(0.3) -- Nghỉ giữa các chiêu
-               end
-            end
-         end)
-      end
-   end,
-})
-
--- Tab 4: ESP
-local Tab4 = Window:CreateTab("ESP", "eye")
-Tab4:CreateToggle({
-   Name = "Player ESP",
-   CurrentValue = false,
-   Callback = function(Value) espEnabled = Value end,
-})
-
--- Tab 5: Movement
-local Tab5 = Window:CreateTab("Movement", "zap")
-Tab5:CreateSlider({
+local Tab3 = Window:CreateTab("Movement", "zap")
+Tab3:CreateSlider({
    Name = "Tốc độ chạy",
-   Range = {16, 300},
-   Increment = 1,
+   Range = {16, 500},
+   Increment = 2,
    CurrentValue = 16,
    Callback = function(Value) originalWalkSpeed = Value end,
 })
 
-Tab5:CreateToggle({
-   Name = "Noclip (Xuyên tường)",
+Tab3:CreateSlider({
+   Name = "Độ cao nhảy",
+   Range = {50, 1000},
+   Increment = 10,
+   CurrentValue = 50,
+   Callback = function(Value) originalJumpPower = Value end,
+})
+
+Tab3:CreateToggle({
+   Name = "Nhảy vô hạn (Inf Jump)",
+   CurrentValue = false,
+   Callback = function(Value) infJumpEnabled = Value end,
+})
+
+Tab3:CreateToggle({
+   Name = "Xuyên tường (Noclip)",
    CurrentValue = false,
    Callback = function(Value) noclipEnabled = Value end,
 })
 
--- LOGIC HỆ THỐNG (Vòng lặp xử lý)
+UserInputService.JumpRequest:Connect(function()
+   if infJumpEnabled then
+      local hum = getHumanoid()
+      if hum then 
+         hum:ChangeState(Enum.HumanoidStateType.Jumping) 
+      end
+   end
+end)
 
--- 1. Xử lý Kill Aura & Auto Parry
 RunService.Heartbeat:Connect(function()
    local char = getCharacter()
    if not char then return end
    local myHRP = getHRP()
    local tool = char:FindFirstChildWhichIsA("Tool")
-
-   for _, player in ipairs(Players:GetPlayers()) do
-      if player ~= LocalPlayer and player.Character then
-         local enemyHRP = player.Character:FindFirstChild("HumanoidRootPart")
-         local enemyHum = player.Character:FindFirstChild("Humanoid")
-         
-         if enemyHRP and enemyHum and enemyHum.Health > 0 then
-            local dist = (enemyHRP.Position - myHRP.Position).Magnitude
-            
-            -- Kill Aura Logic
-            if killAuraEnabled and dist <= killAuraRange and tool then
-               tool:Activate() -- Giả lập chạm màn hình
-               -- Tự tìm Remote để Fire
-               for _, remote in ipairs(tool:GetDescendants()) do
-                  if remote:IsA("RemoteEvent") then
-                     remote:FireServer(enemyHRP.Position)
-                     remote:FireServer(player.Character)
-                  end
-               end
+   
+   local target = nil
+   local dist_f = silentAimFOV
+   for _, p in ipairs(Players:GetPlayers()) do
+      if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(aimPart) then
+         local pos, onScreen = Camera:WorldToViewportPoint(p.Character[aimPart].Position)
+         if onScreen then
+            local d = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+            if d < dist_f then 
+               dist_f = d 
+               target = p.Character 
             end
-            
-            -- Auto Parry Logic (Bấm F khi địch ở gần)
-            if autoParryEnabled and dist <= 12 then
-               VIM:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-               task.wait(0.05)
-               VIM:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+         end
+      end
+   end
+
+   if target and tool then
+      local tPart = target[aimPart]
+      local dist = (tPart.Position - myHRP.Position).Magnitude
+      
+      if (silentAimEnabled or killAuraEnabled) and dist <= 25 then
+         tool:Activate()
+         for _, r in ipairs(tool:GetDescendants()) do
+            if r:IsA("RemoteEvent") then
+               r:FireServer(tPart.Position)
+               r:FireServer(target)
             end
          end
       end
    end
 end)
 
--- 2. Xử lý Noclip & WalkSpeed (Dùng Stepped để không bị giật)
 RunService.Stepped:Connect(function()
-   if noclipEnabled and getCharacter() then
-      for _, part in ipairs(getCharacter():GetDescendants()) do
+   local char = getCharacter()
+   if not char then return end
+   
+   if noclipEnabled then
+      for _, part in ipairs(char:GetDescendants()) do
          if part:IsA("BasePart") then part.CanCollide = false end
       end
    end
    
-   local hum = getHumanoid()
+   local hum = char:FindFirstChildWhichIsA("Humanoid")
    if hum then
       hum.WalkSpeed = originalWalkSpeed
+      hum.UseJumpPower = true
       hum.JumpPower = originalJumpPower
-   end
-end)
-
--- 3. Xử lý Aimbot
-RunService.RenderStepped:Connect(function()
-   if aimbotEnabled then
-      local target = nil
-      local shortestDist = aimbotFOV
       
-      for _, player in ipairs(Players:GetPlayers()) do
-         if player ~= LocalPlayer and player.Character then
-            local part = player.Character:FindFirstChild(aimbotPart)
-            if part then
-               local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-               if onScreen then
-                  local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                  if dist < shortestDist then
-                     shortestDist = dist
-                     target = part
-                  end
-               end
-            end
-         end
-      end
-      
-      if target then
-         Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Position), 1/aimbotSmooth)
+      if noSlowdownEnabled then
+         if hum.PlatformStand then hum.PlatformStand = false end
       end
    end
 end)
 
 Rayfield:Notify({
    Title = "Khanh Hub",
-   Content = "Đã sửa lỗi thành công cho Mobile!",
+   Content = "Script Loaded!",
    Duration = 5,
    Image = "award"
 })
