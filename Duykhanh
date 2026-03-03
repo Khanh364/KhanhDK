@@ -483,4 +483,3 @@ Rayfield:Notify({
    Duration = 7,
    Image = "sword"
 })
-Đã xóa toàn bộ comment và hướng dẫn, giữ nguyên 100% chức năng.
