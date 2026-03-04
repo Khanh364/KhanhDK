@@ -2,7 +2,7 @@ local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "Khánh Hub Ultimate 🍉",
+    Title = "KhanhUltimate",          -- Đã bỏ dưa hấu
     SubTitle = "2026",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
@@ -34,7 +34,7 @@ setreadonly(mt, true)
 Tabs.Main:AddToggle("FA", {Title = "Fast Attack", Default = false, Callback = function(v) getgenv().Config.FastAttack = v end})
 Tabs.Farm:AddToggle("AF", {Title = "Auto Farm", Default = false, Callback = function(v) getgenv().Config.AutoFarm = v end})
 
--- Tạo nút toggle Skibidi (đã sửa để toggle mượt)
+-- Nút toggle Skibidi (vuông, toggle mượt)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "SkibidiToggle"
 ScreenGui.Parent = game:GetService("CoreGui")
@@ -46,27 +46,23 @@ TextButton.Parent = ScreenGui
 TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 TextButton.BackgroundTransparency = 0.3
 TextButton.Position = UDim2.new(0, 10, 0.5, 0)
-TextButton.Size = UDim2.new(0, 80, 0, 35)
+TextButton.Size = UDim2.new(0, 60, 0, 60)  -- Vuông
 TextButton.Text = "skibidi"
 TextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-TextButton.TextSize = 18
+TextButton.TextSize = 14
 TextButton.Font = Enum.Font.SourceSansBold
 TextButton.Active = true
 TextButton.Draggable = true
+TextButton.TextWrapped = true
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.CornerRadius = UDim.new(0, 12)  -- Bo nhẹ, hoặc đổi thành 0 nếu muốn vuông cứng
 UICorner.Parent = TextButton
 
--- Toggle GUI bằng cách giả lập nhấn RightControl (fix lỗi không bật lại được)
 TextButton.MouseButton1Click:Connect(function()
     local vim = game:GetService("VirtualInputManager")
-    
-    -- Nhấn phím
     vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
     task.wait(0.03)
-    
-    -- Thả phím
     vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
 end)
 
