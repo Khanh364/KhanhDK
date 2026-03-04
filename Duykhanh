@@ -29,7 +29,6 @@ local StatsParagraph = Tabs.Bounty:AddParagraph({
     Content = "Updating..."
 })
 
--- Cập nhật thống kê
 task.spawn(function()
     while task.wait(1) do
         local CurrentBounty = LocalPlayer.leaderstats["Bounty/Honor"].Value
@@ -64,36 +63,22 @@ Tabs.Bounty:AddButton({
     end
 })
 
------------------------------------------------------------
--- PHẦN NÚT BẬT/TẮT ĐÃ THAY ICON THEO FILE BẠN GỬI
------------------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
 local ToggleButton = Instance.new("ImageButton", ScreenGui)
 
-ToggleButton.Name = "GodHubToggleButton"
-ToggleButton.Size = UDim2.new(0, 65, 0, 65) -- Kích thước nút
+ToggleButton.Size = UDim2.new(0, 60, 0, 60)
 ToggleButton.Position = UDim2.new(0.05, 0, 0.15, 0)
--- ID Hình ảnh vương miện pixel bạn gửi:
-ToggleButton.Image = "rbxassetid://131119514732649" 
+ToggleButton.Image = "rbxassetid://138096365922096" 
 ToggleButton.BackgroundTransparency = 1 
 ToggleButton.Draggable = true
 ToggleButton.Active = true
 
--- Bo góc cho đẹp nếu cần (optional)
-local UICorner = Instance.new("UICorner", ToggleButton)
-UICorner.CornerRadius = Tool.UDim.new(0, 10)
-
 local MenuVisible = true
 ToggleButton.MouseButton1Click:Connect(function()
     MenuVisible = not MenuVisible
-    -- Tìm menu Fluent để ẩn/hiện
-    for _, child in pairs(game:GetService("CoreGui"):GetChildren()) do
-        if child:IsA("ScreenGui") and (child.Name == "Fluent" or child:FindFirstChild("Main")) then
-            child.Enabled = MenuVisible
-        end
-    end
+    local gui = game:GetService("CoreGui"):FindFirstChild("Fluent") or game:GetService("CoreGui"):FindFirstChild("ScreenGui")
+    if gui then gui.Enabled = MenuVisible end
 end)
------------------------------------------------------------
 
 Tabs.PVP:AddToggle("AutoBounty", {Title = "Auto Farm Bounty", Default = false}):OnChanged(function(V) autoBounty = V end)
 Tabs.PVP:AddToggle("SkillAim", {Title = "Aim Skill (Auto Hit)", Default = false}):OnChanged(function(V) skillAim = V end)
