@@ -1,111 +1,180 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Khanh Hub | Blox Fruits",
-   Icon = "award",
-   LoadingTitle = "Skibidi Loading...",
+   Name = "Khanh Hub | PVP EDITION",
+   Icon = "sword",
+   LoadingTitle = "PVP Script Loading...",
    LoadingSubtitle = "by DK",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = "KhanhHubConfig",
-      FileName = "Main"
-   },
+   ConfigurationSaving = { Enabled = true, FolderName = "KhanhPVP", FileName = "Main" },
    KeySystem = false
 })
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
-local aimbotEnabled, killAuraEnabled, espEnabled = false, false, false
-local hitboxExpanded, autoFarmEnabled, autoEatEnabled = false, false, false
-local aimbotPart, aimbotFOV, aimbotSmooth = "Head", 120, 5
-local killAuraRange, hitboxSize, selectedMob = 15, 10, ""
+local aimbotEnabled, aimbotPart, aimbotFOV, aimbotSmooth = false, "Head", 150, 5
+local killAuraEnabled, killAuraRange = false, 20
+local hitboxEnabled, hitboxSize = false, 15
+local autoParry, antiStun = false, false
+local walkSpeed, jumpPower = 16, 50
 
 local function getCharacter() return LocalPlayer.Character end
-local function getHRP() return getCharacter() and getCharacter():FindFirstChild("HumanoidRootPart") end
+local function getHRP(char) return (char or getCharacter()):FindFirstChild("HumanoidRootPart") end
 
-local function getClosestPlayer(fov)
-   local closestPlayer, closestDist = nil, fov
-   local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-   for _, player in ipairs(Players:GetPlayers()) do
-      if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(aimbotPart) then
-         local screenPos, onScreen = Camera:WorldToViewportPoint(player.Character[aimbotPart].Position)
-         if onScreen then
-            local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-            if dist < closestDist then closestDist, closestPlayer = dist, player end
-         end
-      end
-   end
-   return closestPlayer
-end
-
-local function getClosestMob(range)
-   local closest, closestDist = nil, range
-   local myHRP = getHRP()
-   if not myHRP then return nil end
-   for _, obj in ipairs(workspace.Enemies:GetChildren()) do
-      if obj:FindFirstChild("Humanoid") and obj.Humanoid.Health > 0 and obj:FindFirstChild("HumanoidRootPart") then
-         if selectedMob == "" or obj.Name:lower():find(selectedMob:lower()) then
-            local dist = (obj.HumanoidRootPart.Position - myHRP.Position).Magnitude
-            if dist < closestDist then closestDist, closest = dist, obj end
-         end
-      end
-   end
-   return closest
-end
-
-local TabPVP = Window:CreateTab("PVP", "sword")
-TabPVP:CreateToggle({Name = "Aimbot", CurrentValue = false, Callback = function(V) aimbotEnabled = V end})
-TabPVP:CreateSlider({Name = "Smoothness", Range = {1, 20}, Increment = 1, CurrentValue = 5, Callback = function(V) aimbotSmooth = V end})
-TabPVP:CreateToggle({Name = "Kill Aura", CurrentValue = false, Callback = function(V) killAuraEnabled = V end})
-TabPVP:CreateToggle({Name = "Hitbox Expander", CurrentValue = false, Callback = function(V)
-   hitboxExpanded = V
+local function getClosestPlayer()
+   local target, dist = nil, aimbotFOV
    for _, p in ipairs(Players:GetPlayers()) do
-      if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-         p.Character.HumanoidRootPart.Size = V and Vector3.new(hitboxSize, hitboxSize, hitboxSize) or Vector3.new(2, 2, 1)
-         p.Character.HumanoidRootPart.Transparency = V and 0.7 or 1
+      if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(aimbotPart) then
+         local pos, onScreen = Camera:WorldToViewportPoint(p.Character[aimbotPart].Position)
+         if onScreen then
+            local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+            if magnitude < dist then dist, target = magnitude, p end
+         end
       end
    end
-end})
+   return target
+end
 
-local TabFarm = Window:CreateTab("FARM", "wheat")
-TabFarm:CreateInput({Name = "Mob Name", PlaceholderText = "Monkey...", Callback = function(V) selectedMob = V end})
-TabFarm:CreateToggle({Name = "Auto Farm", CurrentValue = false, Callback = function(V)
-   autoFarmEnabled = V
-   task.spawn(function()
-      while autoFarmEnabled do
-         local mob = getClosestMob(1000)
-         if mob and getHRP() then getHRP().CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 10, 0) end
-         task.wait()
-      end
-   end)
-end})
+local TabPVP = Window:CreateTab("PVP MAIN", "crosshair")
 
-TabFarm:CreateToggle({Name = "Auto Eat Fruit", CurrentValue = false, Callback = function(V)
-   autoEatEnabled = V
-   task.spawn(function()
-      while autoEatEnabled do
-         for _, obj in ipairs(workspace:GetChildren()) do
-            if obj:IsA("Tool") and obj.Name:find("Fruit") and getHRP() then
-               getHRP().CFrame = obj.Handle.CFrame
-               firetouchinterest(getHRP(), obj.Handle, 0)
-               task.wait(0.1)
-               firetouchinterest(getHRP(), obj.Handle, 1)
-            end
-         end
-         task.wait(1)
-      end
-   end)
-end})
+TabPVP:CreateToggle({
+   Name = "Aimbot",
+   CurrentValue = false,
+   Callback = function(V) aimbotEnabled = V end
+})
+
+TabPVP:CreateDropdown({
+   Name = "Target Part",
+   Options = {"Head", "HumanoidRootPart", "LowerTorso"},
+   CurrentOption = {"Head"},
+   Callback = function(V) aimbotPart = V[1] end
+})
+
+TabPVP:CreateSlider({
+   Name = "Aimbot Smoothness",
+   Range = {1, 50},
+   Increment = 1,
+   CurrentValue = 5,
+   Callback = function(V) aimbotSmooth = V end
+})
+
+TabPVP:CreateToggle({
+   Name = "Kill Aura",
+   CurrentValue = false,
+   Callback = function(V) killAuraEnabled = V end
+})
+
+TabPVP:CreateSlider({
+   Name = "Aura Range",
+   Range = {5, 50},
+   Increment = 1,
+   CurrentValue = 20,
+   Callback = function(V) killAuraRange = V end
+})
+
+TabPVP:CreateToggle({
+   Name = "Hitbox Expander",
+   CurrentValue = false,
+   Callback = function(V) hitboxEnabled = V end
+})
+
+TabPVP:CreateSlider({
+   Name = "Hitbox Size",
+   Range = {2, 100},
+   Increment = 1,
+   CurrentValue = 15,
+   Callback = function(V) hitboxSize = V end
+})
+
+TabPVP:CreateToggle({
+   Name = "Auto Parry / Block",
+   CurrentValue = false,
+   Callback = function(V) autoParry = V end
+})
+
+TabPVP:CreateToggle({
+   Name = "Anti-Stun",
+   CurrentValue = false,
+   Callback = function(V) antiStun = V end
+})
+
+local TabMov = Window:CreateTab("MOVEMENT", "zap")
+
+TabMov:CreateSlider({
+   Name = "Walk Speed",
+   Range = {16, 300},
+   Increment = 1,
+   CurrentValue = 16,
+   Callback = function(V) walkSpeed = V end
+})
+
+TabMov:CreateSlider({
+   Name = "Jump Power",
+   Range = {50, 500},
+   Increment = 1,
+   CurrentValue = 50,
+   Callback = function(V) jumpPower = V end
+})
 
 RunService.RenderStepped:Connect(function()
+   local char = getCharacter()
+   if not char then return end
+   
+   local hum = char:FindFirstChildOfClass("Humanoid")
+   if hum then
+      hum.WalkSpeed = walkSpeed
+      hum.JumpPower = jumpPower
+      if antiStun and (hum.PlatformStand or hum:GetState() == Enum.HumanoidStateType.Ragdoll) then
+         hum.PlatformStand = false
+         hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+      end
+   end
+
    if aimbotEnabled then
-      local target = getClosestPlayer(aimbotFOV)
+      local target = getClosestPlayer()
       if target and target.Character and target.Character:FindFirstChild(aimbotPart) then
          Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Character[aimbotPart].Position), 1/aimbotSmooth)
       end
    end
 end)
 
+task.spawn(function()
+   while task.wait(0.1) do
+      local myHRP = getHRP()
+      if not myHRP then continue end
+
+      for _, p in ipairs(Players:GetPlayers()) do
+         if p ~= LocalPlayer and p.Character then
+            local targetHRP = getHRP(p.Character)
+            if targetHRP then
+               if hitboxEnabled then
+                  targetHRP.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                  targetHRP.Transparency = 0.7
+                  targetHRP.CanCollide = false
+               else
+                  targetHRP.Size = Vector3.new(2, 2, 1)
+                  targetHRP.Transparency = 1
+               end
+
+               if killAuraEnabled and (myHRP.Position - targetHRP.Position).Magnitude <= killAuraRange then
+                  local tool = getCharacter():FindFirstChildOfClass("Tool")
+                  if tool then
+                     pcall(function()
+                        local remote = tool:FindFirstChild("RemoteEvent") or tool:FindFirstChild("RemoteFunction")
+                        if remote then remote:FireServer(targetHRP) end
+                        ReplicatedStorage.Remotes.CommF_:InvokeServer("Attack", targetHRP)
+                     end)
+                  end
+               end
+               
+               if autoParry and (myHRP.Position - targetHRP.Position).Magnitude <= 15 then
+                  pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("Block") end)
+               end
+            end
+         end
+      end
+   end
+end)
