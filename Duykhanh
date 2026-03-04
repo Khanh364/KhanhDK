@@ -1,91 +1,199 @@
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
 
-local Window = Fluent:CreateWindow({
-    Title = "God Hub | Auto Bounty",
-    SubTitle = "by DK",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 420),
-    Acrylic = true,
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.End 
+local Window = OrionLib:MakeWindow({
+    Name = "Khanh Hub - Orion Edition", 
+    HidePremium = false, 
+    SaveConfig = true, 
+    ConfigFolder = "KhanhOrion",
+    IntroText = "Khanh Hub Loading..."
 })
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local StartBounty = LocalPlayer.leaderstats["Bounty/Honor"].Value
-local StartTime = os.time()
+local Camera = workspace.CurrentCamera
 
-local skillAim, autoV4, fastAttack, walkSpeed = false, false, false, 16
-local autoHaki, fakeLag, autoBounty = false, false, false
+local silentAimEnabled = false
+local killAuraEnabled = false
+local fastAttackEnabled = false
+local noSlowdownEnabled = false
+local infJumpEnabled = false
+local noclipEnabled = false
+local antiStunEnabled = false
+local walkSpeed = 16
+local jumpPower = 50
+local silentAimFOV = 150
 
-local Tabs = {
-    Bounty = Window:AddTab({ Title = "Auto Bounty", Icon = "target" }),
-    PVP = Window:AddTab({ Title = "PVP Combat", Icon = "crosshair" }),
-    Misc = Window:AddTab({ Title = "Movement", Icon = "zap" })
-}
+local function getChar() return LocalPlayer.Character end
+local function getHum() return getChar() and getChar():FindFirstChildWhichIsA("Humanoid") end
+local function getHRP() return getChar() and getChar():FindFirstChild("HumanoidRootPart") end
 
-local StatsParagraph = Tabs.Bounty:AddParagraph({
-    Title = "Bounty Statistics",
-    Content = "Updating..."
+local Tab1 = Window:MakeTab({
+    Name = "Bounty Hunter",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
 })
 
-task.spawn(function()
-    while task.wait(1) do
-        local CurrentBounty = LocalPlayer.leaderstats["Bounty/Honor"].Value
-        local Earned = CurrentBounty - StartBounty
-        local Elapsed = os.time() - StartTime
-        
-        local h = math.floor(Elapsed / 3600)
-        local m = math.floor((Elapsed % 3600) / 60)
-        local s = Elapsed % 60
-        local TimeStr = string.format("%dh:%dm:%ds", h, m, s)
-        
-        StatsParagraph:SetTitle("Bounty Statistics")
-        StatsParagraph:SetDesc(
-            "Current Bounty: " .. tostring(CurrentBounty) .. "\n" ..
-            "Bounty Earned: " .. tostring(Earned) .. "$\n" ..
-            "Total Bounty Earned: " .. tostring(Earned) .. "$\n" ..
-            "Client Time Elapsed: " .. TimeStr .. "\n" ..
-            "Account Time Elapsed: " .. TimeStr
-        )
-    end
-end)
-
-Tabs.Bounty:AddButton({
-    Title = "Next Player",
-    Callback = function() end
+Tab1:AddToggle({
+    Name = "Silent Aim (Ngắm ngầm)",
+    Default = false,
+    Callback = function(Value) silentAimEnabled = Value end
 })
 
-Tabs.Bounty:AddButton({
-    Title = "Hop Server",
-    Callback = function() 
-        game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+Tab1:AddToggle({
+    Name = "Fast Attack (Đánh cực nhanh)",
+    Default = false,
+    Callback = function(Value)
+        fastAttackEnabled = Value
+        task.spawn(function()
+            while fastAttackEnabled do
+                local tool = getChar() and getChar():FindFirstChildWhichIsA("Tool")
+                if tool then tool:Activate() end
+                task.wait(0.001)
+            end
+        end)
     end
 })
 
-local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local ToggleButton = Instance.new("ImageButton", ScreenGui)
+Tab1:AddButton({
+    Name = "Áp sát mục tiêu gần nhất",
+    Callback = function()
+        local target = nil
+        local dist = math.huge
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (p.Character.HumanoidRootPart.Position - getHRP().Position).Magnitude
+                if d < dist then dist = d target = p.Character end
+            end
+        end
+        if target then
+            getHRP().CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+        end
+    end
+})
 
-ToggleButton.Size = UDim2.new(0, 60, 0, 60)
-ToggleButton.Position = UDim2.new(0.05, 0, 0.15, 0)
-ToggleButton.Image = "rbxassetid://138096365922096" 
-ToggleButton.BackgroundTransparency = 1 
-ToggleButton.Draggable = true
-ToggleButton.Active = true
+local Tab2 = Window:MakeTab({
+    Name = "Combat Pro",
+    Icon = "rbxassetid://4483362458",
+    PremiumOnly = false
+})
 
-local MenuVisible = true
-ToggleButton.MouseButton1Click:Connect(function()
-    MenuVisible = not MenuVisible
-    local gui = game:GetService("CoreGui"):FindFirstChild("Fluent") or game:GetService("CoreGui"):FindFirstChild("ScreenGui")
-    if gui then gui.Enabled = MenuVisible end
+Tab2:AddToggle({
+    Name = "Kill Aura (Tự đánh)",
+    Default = false,
+    Callback = function(Value) killAuraEnabled = Value end
+})
+
+Tab2:AddToggle({
+    Name = "Anti-Stun (Chống khựng)",
+    Default = false,
+    Callback = function(Value) antiStunEnabled = Value end
+})
+
+Tab2:AddToggle({
+    Name = "No Slowdown",
+    Default = false,
+    Callback = function(Value) noSlowdownEnabled = Value end
+})
+
+local Tab3 = Window:MakeTab({
+    Name = "Movement",
+    Icon = "rbxassetid://4483362748",
+    PremiumOnly = false
+})
+
+Tab3:AddSlider({
+    Name = "Tốc độ chạy",
+    Min = 16,
+    Max = 500,
+    Default = 16,
+    Color = Color3.fromRGB(255,255,255),
+    Increment = 1,
+    ValueName = "Speed",
+    Callback = function(Value) walkSpeed = Value end    
+})
+
+Tab3:AddSlider({
+    Name = "Độ cao nhảy",
+    Min = 50,
+    Max = 1000,
+    Default = 50,
+    Color = Color3.fromRGB(255,255,255),
+    Increment = 1,
+    ValueName = "Jump",
+    Callback = function(Value) jumpPower = Value end    
+})
+
+Tab3:AddToggle({
+    Name = "Nhảy vô hạn (Inf Jump)",
+    Default = false,
+    Callback = function(Value) infJumpEnabled = Value end
+})
+
+Tab3:AddToggle({
+    Name = "Xuyên tường (Noclip)",
+    Default = false,
+    Callback = function(Value) noclipEnabled = Value end
+})
+
+UserInputService.JumpRequest:Connect(function()
+   if infJumpEnabled then
+      local hum = getHum()
+      if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+   end
 end)
 
-Tabs.PVP:AddToggle("AutoBounty", {Title = "Auto Farm Bounty", Default = false}):OnChanged(function(V) autoBounty = V end)
-Tabs.PVP:AddToggle("SkillAim", {Title = "Aim Skill (Auto Hit)", Default = false}):OnChanged(function(V) skillAim = V end)
-Tabs.PVP:AddToggle("FastAttack", {Title = "Fast Attack Aura", Default = false}):OnChanged(function(V) fastAttack = V end)
-Tabs.PVP:AddToggle("AutoV4", {Title = "Auto Activate V4", Default = false}):OnChanged(function(V) autoV4 = V end)
+RunService.Heartbeat:Connect(function()
+   local char = getChar()
+   if not char or not getHRP() then return end
+   local tool = char:FindFirstChildWhichIsA("Tool")
+   
+   local target = nil
+   local dist_f = silentAimFOV
+   for _, p in ipairs(Players:GetPlayers()) do
+      if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+         local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+         if onScreen then
+            local d = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+            if d < dist_f then dist_f = d target = p.Character end
+         end
+      end
+   end
 
-Tabs.Misc:AddSlider("WS", {Title = "Walk Speed", Min = 16, Max = 300, Default = 16, Rounding = 0}):OnChanged(function(V) walkSpeed = V end)
-Tabs.Misc:AddToggle("FakeLag", {Title = "Fake Lag", Default = false}):OnChanged(function(V) fakeLag = V end)
+   if target and tool and (silentAimEnabled or killAuraEnabled) then
+      local tHRP = target.HumanoidRootPart
+      if (tHRP.Position - getHRP().Position).Magnitude <= 30 then
+         for _, r in ipairs(tool:GetDescendants()) do
+            if r:IsA("RemoteEvent") then
+               r:FireServer(tHRP.Position)
+               r:FireServer(target)
+            end
+         end
+      end
+   end
+end)
 
-Window:SelectTab(1)
+RunService.Stepped:Connect(function()
+   local char = getChar()
+   if not char then return end
+   if noclipEnabled then
+      for _, p in ipairs(char:GetDescendants()) do
+         if p:IsA("BasePart") then p.CanCollide = false end
+      end
+   end
+   local hum = getHum()
+   if hum then
+      hum.WalkSpeed = walkSpeed
+      hum.JumpPower = jumpPower
+      hum.UseJumpPower = true
+      if antiStunEnabled or noSlowdownEnabled then
+         hum.PlatformStand = false
+         if hum:GetState() == Enum.HumanoidStateType.Ragdoll then
+            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+         end
+      end
+   end
+end)
+
+OrionLib:Init()
