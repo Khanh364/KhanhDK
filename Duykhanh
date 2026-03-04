@@ -20,7 +20,6 @@ local Tabs = {
 local lp = game.Players.LocalPlayer
 getgenv().Config = {}
 
--- Fast Attack Logic
 local mt = getrawmetatable(game)
 local oldNamecall = mt.__namecall
 setreadonly(mt, false)
@@ -32,21 +31,9 @@ mt.__namecall = newcclosure(function(self, ...)
 end)
 setreadonly(mt, true)
 
--- Auto Click
-spawn(function()
-    while task.wait(0.1) do
-        if getgenv().Config.AutoFarm then
-            game:GetService("VirtualUser"):CaptureController()
-            game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
-        end
-    end
-end)
-
--- UI Toggles
 Tabs.Main:AddToggle("FA", {Title = "Fast Attack", Default = false, Callback = function(v) getgenv().Config.FastAttack = v end})
 Tabs.Farm:AddToggle("AF", {Title = "Auto Farm", Default = false, Callback = function(v) getgenv().Config.AutoFarm = v end})
 
--- Nút Skibidi
 local ScreenGui = Instance.new("ScreenGui")
 local TextButton = Instance.new("TextButton")
 local UICorner = Instance.new("UICorner")
@@ -54,22 +41,30 @@ local UICorner = Instance.new("UICorner")
 ScreenGui.Name = "SkibidiToggle"
 ScreenGui.Parent = lp:WaitForChild("PlayerGui")
 ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 999
 
 TextButton.Parent = ScreenGui
 TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 TextButton.BackgroundTransparency = 0.3
 TextButton.Position = UDim2.new(0, 10, 0.5, 0)
-TextButton.Size = UDim2.new(0, 80, 0, 30)
+TextButton.Size = UDim2.new(0, 80, 0, 35)
 TextButton.Text = "skibidi"
 TextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 TextButton.TextSize = 18
+TextButton.Font = Enum.Font.SourceSansBold
 TextButton.Draggable = true
+TextButton.Active = true
 
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = TextButton
 
 TextButton.MouseButton1Click:Connect(function()
-    game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+    local target = game:GetService("CoreGui"):FindFirstChild("Fluent") or lp:WaitForChild("PlayerGui"):FindFirstChild("Fluent")
+    if target then
+        target.Enabled = not target.Enabled
+    else
+        game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+    end
 end)
 
 Window:SelectTab(1)
