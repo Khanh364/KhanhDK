@@ -1,147 +1,105 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
-local Window = Rayfield:CreateWindow({
-   Name = "Khanh Hub | PVP EDITION",
-   Icon = "sword",
-   LoadingTitle = "Skill Aim Fixed",
-   LoadingSubtitle = "by DK",
-   ConfigurationSaving = { Enabled = true, FolderName = "KhanhPVP", FileName = "Main" },
-   KeySystem = false
+local Window = Fluent:CreateWindow({
+    Title = "Khanh Hub | PVP GOD MODE",
+    SubTitle = "by DK",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightControl
 })
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "PVP Combat", Icon = "crosshair" }),
+    Misc = Window:AddTab({ Title = "Movement & Visual", Icon = "zap" })
+}
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
-local aimbotEnabled, aimPart, aimFOV, aimSmooth = false, "HumanoidRootPart", 150, 5
-local skillAimEnabled = false
-local killAuraEnabled, killAuraRange = false, 20
-local hitboxEnabled, hitboxSize = false, 15
-local autoV3, autoV4 = false, false
+local skillAim, autoV4, fastAttack, walkSpeed, jumpPower = false, false, false, 16, 50
+local waterWalk, autoHaki, fakeLag = false, false, false
 
 local function getClosestPlayer()
-   local target, dist = nil, aimFOV
-   for _, p in ipairs(Players:GetPlayers()) do
-      if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(aimPart) then
-         local pos, onScreen = Camera:WorldToViewportPoint(p.Character[aimPart].Position)
-         if onScreen then
-            local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-            if magnitude < dist then dist, target = magnitude, p end
-         end
-      end
-   end
-   return target
-end
-
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
-    
-    if skillAimEnabled and (method == "FireServer" or method == "InvokeServer") then
-        local target = getClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local targetPos = target.Character.HumanoidRootPart.Position
-            for i, arg in pairs(args) do
-                if typeof(arg) == "Vector3" then
-                    args[i] = targetPos
-                elseif typeof(arg) == "CFrame" then
-                    args[i] = CFrame.new(targetPos)
-                end
+    local target, dist = nil, 250
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                if magnitude < dist then dist, target = magnitude, p end
             end
         end
     end
-    return oldNamecall(self, unpack(args))
+    return target
+end
+
+local oldIndex
+oldIndex = hookmetamethod(game, "__index", function(self, index)
+    if skillAim and self == Mouse and (index == "Hit" or index == "Target") then
+        local target = getClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            return index == "Hit" and target.Character.HumanoidRootPart.CFrame or target.Character.HumanoidRootPart
+        end
+    end
+    return oldIndex(self, index)
 end)
 
-local TabPVP = Window:CreateTab("PVP MAIN", "crosshair")
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    if not checkcaller() and (method == "Kick" or method == "kick") then return nil end
+    return oldNamecall(self, ...)
+end)
 
-TabPVP:CreateToggle({
-   Name = "Skill Aim (Redirect Skills)",
-   CurrentValue = false,
-   Callback = function(V) skillAimEnabled = V end
-})
+Tabs.Main:AddToggle("SkillAim", {Title = "Aim Skill (Auto Hit)", Default = false}):OnChanged(function(V) skillAim = V end)
+Tabs.Main:AddToggle("AutoV4", {Title = "Auto Activate V4", Default = false}):OnChanged(function(V) autoV4 = V end)
+Tabs.Main:AddToggle("FastAttack", {Title = "Fast Attack Aura", Default = false}):OnChanged(function(V) fastAttack = V end)
+Tabs.Main:AddToggle("AutoHaki", {Title = "Auto Haki (Buso/Ken)", Default = false}):OnChanged(function(V) autoHaki = V end)
 
-TabPVP:CreateToggle({
-   Name = "Camera Aimbot",
-   CurrentValue = false,
-   Callback = function(V) aimbotEnabled = V end
-})
+Tabs.Misc:AddSlider("WS", {Title = "Walk Speed", Min = 16, Max = 300, Default = 16, Rounding = 0}):OnChanged(function(V) walkSpeed = V end)
+Tabs.Misc:AddSlider("JP", {Title = "Jump Power", Min = 50, Max = 500, Default = 50, Rounding = 0}):OnChanged(function(V) jumpPower = V end)
+Tabs.Misc:AddToggle("WaterWalk", {Title = "Walk on Water", Default = false}):OnChanged(function(V) waterWalk = V end)
+Tabs.Misc:AddToggle("FakeLag", {Title = "Fake Lag", Default = false}):OnChanged(function(V) fakeLag = V end)
 
-TabPVP:CreateSlider({
-   Name = "Aim Smoothness",
-   Range = {1, 20},
-   Increment = 1,
-   CurrentValue = 5,
-   Callback = function(V) aimSmooth = V end
-})
-
-TabPVP:CreateToggle({
-   Name = "Kill Aura",
-   CurrentValue = false,
-   Callback = function(V) killAuraEnabled = V end
-})
-
-TabPVP:CreateToggle({
-   Name = "Hitbox Expander",
-   CurrentValue = false,
-   Callback = function(V) hitboxEnabled = V end
-})
-
-TabPVP:CreateSlider({
-   Name = "Hitbox Size",
-   Range = {2, 100},
-   Increment = 1,
-   CurrentValue = 15,
-   Callback = function(V) hitboxSize = V end
-})
-
-TabPVP:CreateToggle({
-   Name = "Auto Activate V3",
-   CurrentValue = false,
-   Callback = function(V) autoV3 = V end
-})
-
-TabPVP:CreateToggle({
-   Name = "Auto Activate V4",
-   CurrentValue = false,
-   Callback = function(V) autoV4 = V end
-})
-
-RunService.RenderStepped:Connect(function()
-   if aimbotEnabled then
-      local target = getClosestPlayer()
-      if target and target.Character and target.Character:FindFirstChild(aimPart) then
-         Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Character[aimPart].Position), 1/aimSmooth)
-      end
-   end
+RunService.Stepped:Connect(function()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = walkSpeed
+        char.Humanoid.JumpPower = jumpPower
+        if waterWalk and char:FindFirstChild("HumanoidRootPart") then
+            if char.HumanoidRootPart.Position.Y < 1 then
+                char.HumanoidRootPart.Velocity = Vector3.new(char.HumanoidRootPart.Velocity.X, 0, char.HumanoidRootPart.Velocity.Z)
+                char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, 0.5, 0)
+            end
+        end
+    end
+    settings().Network.IncomingReplicationLag = fakeLag and 1000 or 0
 end)
 
 task.spawn(function()
-   while task.wait(0.1) do
-      if autoV3 then pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateAbility") end) end
-      if autoV4 then pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateTransformation") end) end
-      
-      for _, p in ipairs(Players:GetPlayers()) do
-         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = p.Character.HumanoidRootPart
-            if hitboxEnabled then
-               hrp.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-               hrp.Transparency = 0.7
-               hrp.CanCollide = false
-            else
-               hrp.Size = Vector3.new(2, 2, 1)
-               hrp.Transparency = 1
+    while task.wait(0.1) do
+        pcall(function()
+            if autoHaki then
+                if not LocalPlayer.Character:FindFirstChild("HasBuso") then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso")
+                end
+                game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
             end
-
-            if killAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-               if (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude <= killAuraRange then
-                  pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("Attack", hrp) end)
-               end
+            if autoV4 then ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateTransformation") end
+            if fastAttack then
+                local target = getClosestPlayer()
+                if target and target.Character and (LocalPlayer.Character.HumanoidRootPart.Position - target.Character.HumanoidRootPart.Position).Magnitude <= 40 then
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("Attack", target.Character.HumanoidRootPart)
+                end
             end
-         end
-      end
-   end
+        end)
+    end
 end)
+
+Window:SelectTab(1)
