@@ -1,4 +1,5 @@
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 
 local Window = Fluent:CreateWindow({
     Title = "KhanhUltimate",
@@ -16,32 +17,32 @@ local Tabs = {
     Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
 }
 
--- Nút bật/tắt (đã đổi sang PlayerGui để dễ hiện hơn)
-local lp = game.Players.LocalPlayer
+-- Nút toggle Pro (vuông, xanh lá, toggle mượt)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ProToggle"
-ScreenGui.Parent = lp:WaitForChild("PlayerGui")  -- Fix: dùng PlayerGui thay CoreGui
+ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 999
+ScreenGui.DisplayOrder = 9999
 
-local btn = Instance.new("TextButton")
-btn.Parent = ScreenGui
-btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
-btn.BackgroundTransparency = 0.3
-btn.Position = UDim2.new(0,10,0.5,0)
-btn.Size = UDim2.new(0,60,0,60)
-btn.Text = "Pro"
-btn.TextColor3 = Color3.fromRGB(0,255,0)
-btn.TextSize = 20
-btn.Font = Enum.Font.SourceSansBold
-btn.Draggable = true
-btn.Active = true
+local TextButton = Instance.new("TextButton")
+TextButton.Parent = ScreenGui
+TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+TextButton.BackgroundTransparency = 0.3
+TextButton.Position = UDim2.new(0, 10, 0.5, 0)
+TextButton.Size = UDim2.new(0, 60, 0, 60)
+TextButton.Text = "Pro"
+TextButton.TextColor3 = Color3.fromRGB(0, 255, 0)
+TextButton.TextSize = 20
+TextButton.Font = Enum.Font.SourceSansBold
+TextButton.Active = true
+TextButton.Draggable = true
+TextButton.TextWrapped = true
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0,12)
-corner.Parent = btn
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = TextButton
 
-btn.MouseButton1Click:Connect(function()
+TextButton.MouseButton1Click:Connect(function()
     local vim = game:GetService("VirtualInputManager")
     vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
     task.wait(0.03)
@@ -49,5 +50,3 @@ btn.MouseButton1Click:Connect(function()
 end)
 
 Window:SelectTab(1)
-
-print("Nút Pro đã tạo - kiểm tra PlayerGui hoặc màn hình!")
