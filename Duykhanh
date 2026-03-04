@@ -7,10 +7,10 @@ local Window = Fluent:CreateWindow({
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
     Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.K 
+    MinimizeKey = Enum.KeyCode.End
 })
 
--- Tạo Icon nổi để bật/tắt Menu (Dành cho Mobile và PC)
+local MenuVisible = true
 local ScreenGui = Instance.new("ScreenGui")
 local ToggleButton = Instance.new("ImageButton")
 local UICorner = Instance.new("UICorner")
@@ -22,18 +22,29 @@ ScreenGui.ResetOnSpawn = false
 ToggleButton.Name = "ToggleButton"
 ToggleButton.Parent = ScreenGui
 ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-ToggleButton.BorderSizePixel = 0
 ToggleButton.Position = UDim2.new(0.1, 0, 0.15, 0)
 ToggleButton.Size = UDim2.new(0, 50, 0, 50)
-ToggleButton.Image = "rbxassetid://15125530105" -- Icon hình khiên
-ToggleButton.Draggable = true -- Có thể kéo di chuyển vị trí nút
+ToggleButton.Image = "rbxassetid://15125530105"
+ToggleButton.Draggable = true 
 
 UICorner.CornerRadius = UDim.new(0, 12)
 UICorner.Parent = ToggleButton
 
--- Logic khi bấm vào Icon
-ToggleButton.MouseButton1Click:Connect(function()
-    game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.K, false, game)
+local function ToggleMenu()
+    MenuVisible = not MenuVisible
+    for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
+        if gui:IsA("ScreenGui") and (gui.Name == "Fluent" or gui:FindFirstChild("Main")) then
+            gui.Enabled = MenuVisible
+        end
+    end
+end
+
+ToggleButton.MouseButton1Click:Connect(ToggleMenu)
+
+game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.K then
+        ToggleMenu()
+    end
 end)
 
 local Tabs = {
