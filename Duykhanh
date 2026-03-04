@@ -1,101 +1,40 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Khanh",
+   Name = "Khanh Hub | Blox Fruits",
    Icon = "award",
-   LoadingTitle = "skibidi",
-   LoadingSubtitle = "DK",
-   ShowText = "Khanh Hub",
-   Theme = "Default",
-   ToggleUIKeybind = "K",
-   DisableRayfieldPrompts = false,
-   DisableBuildWarnings = false,
+   LoadingTitle = "Skibidi Loading...",
+   LoadingSubtitle = "by DK",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = nil,
-      FileName = "KhanhHub"
+      FolderName = "KhanhHubConfig",
+      FileName = "Main"
    },
-   Discord = {
-      Enabled = false,
-      Invite = "noinvitelink",
-      RememberJoins = true
-   },
-   KeySystem = false,
-   KeySettings = {
-      Title = "Khanh Hub",
-      Subtitle = "Key System",
-      Note = "No key needed",
-      FileName = "KhanhKey",
-      SaveKey = true,
-      GrabKeyFromSite = false,
-      Key = {"khanh2026"}
-   }
+   KeySystem = false
 })
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
-local aimbotEnabled = false
-local killAuraEnabled = false
-local espEnabled = false
-local autoParryEnabled = false
-local noclipEnabled = false
-local hitboxExpanded = false
-local aimbotPart = "Head"
-local aimbotFOV = 120
-local aimbotSmooth = 5
-local killAuraRange = 10
-local hitboxSize = 10
-local espBoxes = {}
-local espConnections = {}
-local originalWalkSpeed = 16
-local originalJumpPower = 50
+local aimbotEnabled, killAuraEnabled, espEnabled = false, false, false
+local hitboxExpanded, autoFarmEnabled, autoEatEnabled = false, false, false
+local aimbotPart, aimbotFOV, aimbotSmooth = "Head", 120, 5
+local killAuraRange, hitboxSize, selectedMob = 15, 10, ""
 
-local autoFarmEnabled = false
-local autoQuestEnabled = false
-local autoMasteryEnabled = false
-local autoEatEnabled = false
-local selectedMob = ""
-local farmConnection = nil
-local questConnection = nil
-local masteryConnection = nil
-local eatConnection = nil
-
-local function getCharacter()
-   return LocalPlayer.Character
-end
-
-local function getHumanoid()
-   local char = getCharacter()
-   return char and char:FindFirstChildWhichIsA("Humanoid")
-end
-
-local function getHRP()
-   local char = getCharacter()
-   return char and char:FindFirstChild("HumanoidRootPart")
-end
+local function getCharacter() return LocalPlayer.Character end
+local function getHRP() return getCharacter() and getCharacter():FindFirstChild("HumanoidRootPart") end
 
 local function getClosestPlayer(fov)
-   local closestPlayer = nil
-   local closestDist = fov
+   local closestPlayer, closestDist = nil, fov
    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
    for _, player in ipairs(Players:GetPlayers()) do
-      if player ~= LocalPlayer and player.Character then
-         local targetPart = player.Character:FindFirstChild(aimbotPart)
-         if targetPart then
-            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-            if onScreen then
-               local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-               if dist < closestDist then
-                  closestDist = dist
-                  closestPlayer = player
-               end
-            end
+      if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(aimbotPart) then
+         local screenPos, onScreen = Camera:WorldToViewportPoint(player.Character[aimbotPart].Position)
+         if onScreen then
+            local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+            if dist < closestDist then closestDist, closestPlayer = dist, player end
          end
       end
    end
@@ -103,23 +42,14 @@ local function getClosestPlayer(fov)
 end
 
 local function getClosestMob(range)
-   local closest = nil
-   local closestDist = range
+   local closest, closestDist = nil, range
    local myHRP = getHRP()
-   if not myHRP then return end
-   for _, obj in ipairs(workspace:GetDescendants()) do
-      if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
-         if not Players:GetPlayerFromCharacter(obj) then
-            local hum = obj:FindFirstChild("Humanoid")
-            if hum and hum.Health > 0 then
-               if selectedMob == "" or obj.Name:lower():find(selectedMob:lower()) then
-                  local dist = (obj.HumanoidRootPart.Position - myHRP.Position).Magnitude
-                  if dist < closestDist then
-                     closestDist = dist
-                     closest = obj
-                  end
-               end
-            end
+   if not myHRP then return nil end
+   for _, obj in ipairs(workspace.Enemies:GetChildren()) do
+      if obj:FindFirstChild("Humanoid") and obj.Humanoid.Health > 0 and obj:FindFirstChild("HumanoidRootPart") then
+         if selectedMob == "" or obj.Name:lower():find(selectedMob:lower()) then
+            local dist = (obj.HumanoidRootPart.Position - myHRP.Position).Magnitude
+            if dist < closestDist then closestDist, closest = dist, obj end
          end
       end
    end
@@ -127,507 +57,55 @@ local function getClosestMob(range)
 end
 
 local TabPVP = Window:CreateTab("PVP", "sword")
-
-TabPVP:CreateToggle({
-   Name = "Aimbot",
-   CurrentValue = false,
-   Flag = "AimbotToggle",
-   Callback = function(Value)
-      aimbotEnabled = Value
-   end,
-})
-
-TabPVP:CreateDropdown({
-   Name = "Aim Part",
-   Options = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
-   CurrentOption = {"Head"},
-   Flag = "AimPart",
-   Callback = function(Option)
-      aimbotPart = Option[1]
-   end,
-})
-
-TabPVP:CreateSlider({
-   Name = "Aimbot FOV",
-   Range = {10, 800},
-   Increment = 10,
-   Suffix = "px",
-   CurrentValue = 120,
-   Flag = "AimbotFOV",
-   Callback = function(Value)
-      aimbotFOV = Value
-   end,
-})
-
-TabPVP:CreateSlider({
-   Name = "Aimbot Smoothness",
-   Range = {1, 100},
-   Increment = 1,
-   Suffix = "x",
-   CurrentValue = 5,
-   Flag = "AimbotSmooth",
-   Callback = function(Value)
-      aimbotSmooth = Value
-   end,
-})
-
-TabPVP:CreateSlider({
-   Name = "Aim Prediction",
-   Range = {0, 20},
-   Increment = 1,
-   Suffix = "studs",
-   CurrentValue = 0,
-   Flag = "AimPrediction",
-   Callback = function(Value)
-      _G.AimPrediction = Value
-   end,
-})
-
-TabPVP:CreateToggle({
-   Name = "Kill Aura",
-   CurrentValue = false,
-   Flag = "KillAuraToggle",
-   Callback = function(Value)
-      killAuraEnabled = Value
-   end,
-})
-
-TabPVP:CreateSlider({
-   Name = "Kill Aura Range",
-   Range = {5, 100},
-   Increment = 5,
-   Suffix = "studs",
-   CurrentValue = 10,
-   Flag = "KillAuraRange",
-   Callback = function(Value)
-      killAuraRange = Value
-   end,
-})
-
-TabPVP:CreateToggle({
-   Name = "Hitbox Expander",
-   CurrentValue = false,
-   Flag = "HitboxToggle",
-   Callback = function(Value)
-      hitboxExpanded = Value
-      for _, player in ipairs(Players:GetPlayers()) do
-         if player ~= LocalPlayer and player.Character then
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-               if Value then
-                  hrp.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-               else
-                  hrp.Size = Vector3.new(2, 2, 1)
-               end
-            end
-         end
-      end
-   end,
-})
-
-TabPVP:CreateSlider({
-   Name = "Hitbox Size",
-   Range = {5, 50},
-   Increment = 5,
-   Suffix = "studs",
-   CurrentValue = 10,
-   Flag = "HitboxSize",
-   Callback = function(Value)
-      hitboxSize = Value
-   end,
-})
-
-TabPVP:CreateToggle({
-   Name = "Auto Parry",
-   CurrentValue = false,
-   Flag = "AutoParryToggle",
-   Callback = function(Value)
-      autoParryEnabled = Value
-      if Value then
-         _G.AutoParryConn = RunService.Heartbeat:Connect(function()
-            if not autoParryEnabled then
-               _G.AutoParryConn:Disconnect()
-               return
-            end
-            for _, player in ipairs(Players:GetPlayers()) do
-               if player ~= LocalPlayer and player.Character then
-                  local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-                  local myHRP = getHRP()
-                  if hrp and myHRP and (hrp.Position - myHRP.Position).Magnitude < 15 then
-                     pcall(function() fireclickdetector(hrp) end)
-                  end
-               end
-            end
-         end)
-      end
-   end,
-})
-
-TabPVP:CreateToggle({
-   Name = "Anti Ragdoll",
-   CurrentValue = false,
-   Flag = "AntiRagdollToggle",
-   Callback = function(Value)
-      if Value then
-         local char = getCharacter()
-         if char then
-            _G.AntiRagdollConn = char.DescendantAdded:Connect(function(obj)
-               if obj.Name == "RagdollConstraint" or obj:IsA("BallSocketConstraint") then
-                  pcall(function() obj:Destroy() end)
-               end
-            end)
-         end
-      else
-         if _G.AntiRagdollConn then _G.AntiRagdollConn:Disconnect() end
-      end
-   end,
-})
-
-TabPVP:CreateToggle({
-   Name = "Anti-Stun",
-   CurrentValue = false,
-   Flag = "AntiStunToggle",
-   Callback = function(Value)
-      _G.AntiStun = Value
-      if Value then
-         _G.AntiStunConn = RunService.Heartbeat:Connect(function()
-            if not _G.AntiStun then _G.AntiStunConn:Disconnect() return end
-            local hum = getHumanoid()
-            if hum then
-               local state = hum:GetState()
-               if state == Enum.HumanoidStateType.StrafingNoPhysics
-               or state == Enum.HumanoidStateType.FallingDown
-               or state == Enum.HumanoidStateType.Ragdoll then
-                  hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-               end
-               hum.AutoRotate = true
-               hum.PlatformStand = false
-            end
-            local char = getCharacter()
-            if char then
-               for _, obj in ipairs(char:GetDescendants()) do
-                  if obj:IsA("BallSocketConstraint") or obj.Name == "RagdollConstraint"
-                  or obj.Name == "StunEffect" or obj.Name == "Stun" then
-                     pcall(function() obj:Destroy() end)
-                  end
-               end
-            end
-         end)
-      else
-         if _G.AntiStunConn then _G.AntiStunConn:Disconnect() end
-      end
-   end,
-})
-
-RunService.RenderStepped:Connect(function()
-   if not aimbotEnabled then return end
-   local target = getClosestPlayer(aimbotFOV)
-   if target and target.Character then
-      local part = target.Character:FindFirstChild(aimbotPart)
-      if part then
-         local prediction = _G.AimPrediction or 0
-         local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-         local targetPos = part.Position
-         if prediction > 0 and hrp then
-            targetPos = targetPos + hrp.Velocity * prediction * 0.016
-         end
-         Camera.CFrame = Camera.CFrame:Lerp(
-            CFrame.new(Camera.CFrame.Position, targetPos),
-            1 / aimbotSmooth
-         )
+TabPVP:CreateToggle({Name = "Aimbot", CurrentValue = false, Callback = function(V) aimbotEnabled = V end})
+TabPVP:CreateSlider({Name = "Smoothness", Range = {1, 20}, Increment = 1, CurrentValue = 5, Callback = function(V) aimbotSmooth = V end})
+TabPVP:CreateToggle({Name = "Kill Aura", CurrentValue = false, Callback = function(V) killAuraEnabled = V end})
+TabPVP:CreateToggle({Name = "Hitbox Expander", CurrentValue = false, Callback = function(V)
+   hitboxExpanded = V
+   for _, p in ipairs(Players:GetPlayers()) do
+      if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+         p.Character.HumanoidRootPart.Size = V and Vector3.new(hitboxSize, hitboxSize, hitboxSize) or Vector3.new(2, 2, 1)
+         p.Character.HumanoidRootPart.Transparency = V and 0.7 or 1
       end
    end
-end)
-
-RunService.Heartbeat:Connect(function()
-   if killAuraEnabled and LocalPlayer.Character then
-      local myHRP = getHRP()
-      if myHRP then
-         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-               local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-               if hrp and (hrp.Position - myHRP.Position).Magnitude <= killAuraRange then
-                  local tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
-                  if tool and tool:FindFirstChild("Handle") then
-                     local event = tool:FindFirstChild("RemoteEvent") or tool:FindFirstChild("RemoteFunction")
-                     if event then
-                        pcall(function() event:FireServer(hrp) end)
-                     end
-                  end
-               end
-            end
-         end
-      end
-   end
-end)
-
-local TabESP = Window:CreateTab("ESP", "eye")
-
-local function createESP(player)
-   local billboardGui = Instance.new("BillboardGui")
-   billboardGui.Name = "ESP_" .. player.Name
-   billboardGui.AlwaysOnTop = true
-   billboardGui.Size = UDim2.new(0, 120, 0, 45)
-   billboardGui.StudsOffset = Vector3.new(0, 3, 0)
-   local nameLabel = Instance.new("TextLabel")
-   nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
-   nameLabel.BackgroundTransparency = 1
-   nameLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
-   nameLabel.TextStrokeTransparency = 0
-   nameLabel.Font = Enum.Font.GothamBold
-   nameLabel.TextScaled = true
-   nameLabel.Text = player.Name
-   nameLabel.Parent = billboardGui
-   local healthLabel = Instance.new("TextLabel")
-   healthLabel.Size = UDim2.new(1, 0, 0.5, 0)
-   healthLabel.Position = UDim2.new(0, 0, 0.5, 0)
-   healthLabel.BackgroundTransparency = 1
-   healthLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
-   healthLabel.TextStrokeTransparency = 0
-   healthLabel.Font = Enum.Font.Gotham
-   healthLabel.TextScaled = true
-   healthLabel.Name = "HealthLabel"
-   healthLabel.Parent = billboardGui
-   espBoxes[player.Name] = {gui = billboardGui, healthLabel = healthLabel}
-   local conn = RunService.Heartbeat:Connect(function()
-      if not espEnabled or not player.Character then
-         billboardGui.Parent = nil
-         return
-      end
-      local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-      local hum = player.Character:FindFirstChildWhichIsA("Humanoid")
-      if hrp and hum then
-         billboardGui.Adornee = hrp
-         billboardGui.Parent = game.CoreGui
-         local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
-         healthLabel.Text = string.format("HP: %d | %dm", math.floor(hum.Health), dist)
-      end
-   end)
-   espConnections[player.Name] = conn
-end
-
-local function removeESP(player)
-   if espBoxes[player.Name] then
-      espBoxes[player.Name].gui:Destroy()
-      espBoxes[player.Name] = nil
-   end
-   if espConnections[player.Name] then
-      espConnections[player.Name]:Disconnect()
-      espConnections[player.Name] = nil
-   end
-end
-
-TabESP:CreateToggle({
-   Name = "Player ESP",
-   CurrentValue = false,
-   Flag = "ESPToggle",
-   Callback = function(Value)
-      espEnabled = Value
-      if Value then
-         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then createESP(player) end
-         end
-         Players.PlayerAdded:Connect(function(player)
-            if espEnabled then createESP(player) end
-         end)
-         Players.PlayerRemoving:Connect(function(player)
-            removeESP(player)
-         end)
-      else
-         for _, player in ipairs(Players:GetPlayers()) do
-            removeESP(player)
-         end
-      end
-   end,
-})
-
-TabESP:CreateToggle({
-   Name = "Chams",
-   CurrentValue = false,
-   Flag = "ChamsToggle",
-   Callback = function(Value)
-      for _, player in ipairs(Players:GetPlayers()) do
-         if player ~= LocalPlayer and player.Character then
-            local highlight = player.Character:FindFirstChild("KhanhESPHighlight")
-            if Value then
-               if not highlight then
-                  local h = Instance.new("SelectionBox")
-                  h.Name = "KhanhESPHighlight"
-                  h.Color3 = Color3.fromRGB(255, 0, 0)
-                  h.LineThickness = 0.05
-                  h.Adornee = player.Character
-                  h.Parent = player.Character
-               end
-            else
-               if highlight then highlight:Destroy() end
-            end
-         end
-      end
-   end,
-})
-
-TabESP:CreateToggle({
-   Name = "Show Hitbox",
-   CurrentValue = false,
-   Flag = "ShowHitboxToggle",
-   Callback = function(Value)
-      for _, player in ipairs(Players:GetPlayers()) do
-         if player ~= LocalPlayer and player.Character then
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-               local box = hrp:FindFirstChild("HitboxViz")
-               if Value then
-                  if not box then
-                     local part = Instance.new("SelectionBox")
-                     part.Name = "HitboxViz"
-                     part.Color3 = Color3.fromRGB(0, 255, 0)
-                     part.Adornee = hrp
-                     part.Parent = hrp
-                  end
-               else
-                  if box then box:Destroy() end
-               end
-            end
-         end
-      end
-   end,
-})
-
-TabESP:CreateToggle({
-   Name = "Fruit ESP",
-   CurrentValue = false,
-   Flag = "FruitESPToggle",
-   Callback = function(Value)
-      _G.FruitESP = Value
-      if Value then
-         _G.FruitESPConn = RunService.Heartbeat:Connect(function()
-            if not _G.FruitESP then _G.FruitESPConn:Disconnect() return end
-            for _, obj in ipairs(workspace:GetDescendants()) do
-               if obj:IsA("Model") and obj:FindFirstChild("Handle") then
-                  local existing = obj:FindFirstChild("FruitESPBill")
-                  if not existing then
-                     local bb = Instance.new("BillboardGui")
-                     bb.Name = "FruitESPBill"
-                     bb.AlwaysOnTop = true
-                     bb.Size = UDim2.new(0, 100, 0, 30)
-                     bb.StudsOffset = Vector3.new(0, 2, 0)
-                     local lbl = Instance.new("TextLabel")
-                     lbl.Size = UDim2.new(1, 0, 1, 0)
-                     lbl.BackgroundTransparency = 1
-                     lbl.TextColor3 = Color3.fromRGB(255, 220, 0)
-                     lbl.TextStrokeTransparency = 0
-                     lbl.Font = Enum.Font.GothamBold
-                     lbl.TextScaled = true
-                     lbl.Text = obj.Name
-                     lbl.Parent = bb
-                     bb.Adornee = obj.Handle
-                     bb.Parent = game.CoreGui
-                  end
-               end
-            end
-         end)
-      else
-         if _G.FruitESPConn then _G.FruitESPConn:Disconnect() end
-         for _, obj in ipairs(game.CoreGui:GetDescendants()) do
-            if obj.Name == "FruitESPBill" then obj:Destroy() end
-         end
-      end
-   end,
-})
+end})
 
 local TabFarm = Window:CreateTab("FARM", "wheat")
-
-TabFarm:CreateInput({
-   Name = "Mob Name",
-   CurrentValue = "",
-   PlaceholderText = "Vi du: Monkey, Pirate...",
-   RemoveTextAfterFocusLost = false,
-   Flag = "MobName",
-   Callback = function(Value)
-      selectedMob = Value
-   end,
-})
-
-TabFarm:CreateToggle({
-   Name = "Auto Farm Mob",
-   CurrentValue = false,
-   Flag = "AutoFarmToggle",
-   Callback = function(Value)
-      autoFarmEnabled = Value
-      if Value then
-         farmConnection = RunService.Heartbeat:Connect(function()
-            if not autoFarmEnabled then
-               farmConnection:Disconnect()
-               return
-            end
-            local myHRP = getHRP()
-            local hum = getHumanoid()
-            if not myHRP or not hum or hum.Health <= 0 then return end
-            local mob = getClosestMob(500)
-            if mob and mob:FindFirstChild("HumanoidRootPart") then
-               local mobHRP = mob.HumanoidRootPart
-               local dist = (mobHRP.Position - myHRP.Position).Magnitude
-               if dist > 10 then
-                  myHRP.CFrame = CFrame.new(mobHRP.Position + Vector3.new(0, 3, 5))
-               end
-               local tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
-               if tool then
-                  local event = tool:FindFirstChild("RemoteEvent") or tool:FindFirstChild("RemoteFunction")
-                  if event then
-                     pcall(function() event:FireServer(mobHRP) end)
-                  end
-                  pcall(function()
-                     game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Attack", mobHRP)
-                  end)
-               end
-            end
-         end)
-      else
-         if farmConnection then farmConnection:Disconnect() end
+TabFarm:CreateInput({Name = "Mob Name", PlaceholderText = "Monkey...", Callback = function(V) selectedMob = V end})
+TabFarm:CreateToggle({Name = "Auto Farm", CurrentValue = false, Callback = function(V)
+   autoFarmEnabled = V
+   task.spawn(function()
+      while autoFarmEnabled do
+         local mob = getClosestMob(1000)
+         if mob and getHRP() then getHRP().CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 10, 0) end
+         task.wait()
       end
-   end,
-})
+   end)
+end})
 
-TabFarm:CreateToggle({
-   Name = "Auto Quest",
-   CurrentValue = false,
-   Flag = "AutoQuestToggle",
-   Callback = function(Value)
-      autoQuestEnabled = Value
-      if Value then
-         questConnection = RunService.Heartbeat:Connect(function()
-            if not autoQuestEnabled then
-               questConnection:Disconnect()
-               return
+TabFarm:CreateToggle({Name = "Auto Eat Fruit", CurrentValue = false, Callback = function(V)
+   autoEatEnabled = V
+   task.spawn(function()
+      while autoEatEnabled do
+         for _, obj in ipairs(workspace:GetChildren()) do
+            if obj:IsA("Tool") and obj.Name:find("Fruit") and getHRP() then
+               getHRP().CFrame = obj.Handle.CFrame
+               firetouchinterest(getHRP(), obj.Handle, 0)
+               task.wait(0.1)
+               firetouchinterest(getHRP(), obj.Handle, 1)
             end
-            pcall(function()
-               local questLevel = LocalPlayer.Data.QuestV2.Value
-               if questLevel == 0 then
-                  game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", _G.QuestId or 1)
-               end
-            end)
-         end)
-      else
-         if questConnection then questConnection:Disconnect() end
+         end
+         task.wait(1)
       end
-   end,
-})
+   end)
+end})
 
-TabFarm:CreateToggle({
-   Name = "Auto Eat Fruit",
-   CurrentValue = false,
-   Flag = "AutoEatToggle",
-   Callback = function(Value)
-      autoEatEnabled = Value
-      if Value then
-         eatConnection = RunService.Heartbeat:Connect(function()
-            if not autoEatEnabled then
-               eatConnection:Disconnect()
-               return
-            end
-            pcall(function()
-               for _, fruit in ipairs(workspace:GetDescendants()) do
-                  if fruit:IsA("Model") and fruit:FindFirstChild("Handle") then
-                     local myHRP = getHRP()
-                     if myHRP and (fruit.Handle.Position - myHRP.Position).Magnitude < 10 then
-   
+RunService.RenderStepped:Connect(function()
+   if aimbotEnabled then
+      local target = getClosestPlayer(aimbotFOV)
+      if target and target.Character and target.Character:FindFirstChild(aimbotPart) then
+         Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Character[aimbotPart].Position), 1/aimbotSmooth)
+      end
+   end
+end)
+
