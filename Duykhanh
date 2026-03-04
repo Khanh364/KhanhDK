@@ -17,229 +17,6 @@ local Tabs = {
     Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
 }
 
-local lp = game.Players.LocalPlayer
-local RS = game:GetService("RunService")
-local TS = game:GetService("TeleportService")
-local Lighting = game:GetService("Lighting")
-local UIS = game:GetService("UserInputService")
-local VIM = game:GetService("VirtualInputManager")
-local PathfindingService = game:GetService("PathfindingService")
-
-getgenv().Config = {
-    -- Main
-    FastAttack = false, GodMode = false,
-    -- Farm
-    AutoFarmLevel = false, BringMob = false, BypassTP = false, AutoMastery = false,
-    FarmDelay = 0.3, Team = "Pirates",
-    -- Misc
-    Fly = false, Noclip = false, InfJump = false, Fullbright = false,
-    WalkSpeed = 16, JumpPower = 50, HipHeight = 0
-}
-
--- Functions chung
-local function getChar() return lp.Character or lp.CharacterAdded:Wait() end
-local function getHRP() local char = getChar() return char:WaitForChild("HumanoidRootPart") end
-local function getHum() local char = getChar() return char:WaitForChild("Humanoid") end
-
--- Fast Attack (Bypass 2026 - VIM simulate click + fallback hook)
-local FastAttackConn
-local function toggleFastAttack(v)
-    getgenv().Config.FastAttack = v
-    if FastAttackConn then FastAttackConn:Disconnect() end
-    if v then
-        FastAttackConn = RS.Heartbeat:Connect(function()
-            VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-            task.wait(0.01)
-            VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-        end)
-    end
-end
-
--- God Mode (Auto heal + bypass damage)
-local GodConn
-local function toggleGodMode(v)
-    getgenv().Config.GodMode = v
-    if GodConn then GodConn:Disconnect() end
-    if v then
-        GodConn = RS.Heartbeat:Connect(function()
-            local hum = getHum()
-            if hum then
-                hum.Health = hum.MaxHealth
-                hum.PlatformStand = true
-                task.wait(0.05)
-                hum.PlatformStand = false
-            end
-        end)
-    end
-end
-
--- Fly (Misc - Mượt 2026)
-local FlyConn, BV, BG
-local function toggleFly(v)
-    getgenv().Config.Fly = v
-    local hrp = getHRP()
-    local hum = getHum()
-    if v then
-        BV = Instance.new("BodyVelocity", hrp); BV.MaxForce = Vector3.new(4000, 4000, 4000); BV.Velocity = Vector3.new(0, 0.1, 0)
-        BG = Instance.new("BodyGyro", hrp); BG.MaxTorque = Vector3.new(4000, 4000, 4000); BG.CFrame = hrp.CFrame
-        FlyConn = RS.Heartbeat:Connect(function()
-            if not getgenv().Config.Fly then return end
-            local cam = workspace.CurrentCamera
-            local move = hum.MoveDirection * 50
-            BV.Velocity = cam.CFrame:VectorToWorldSpace(move)
-            if UIS:IsKeyDown(Enum.KeyCode.Space) then BV.Velocity += Vector3.new(0, 50, 0) end
-            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then BV.Velocity -= Vector3.new(0, 50, 0) end
-        end)
-    else
-        if FlyConn then FlyConn:Disconnect() end
-        if BV then BV:Destroy() end
-        if BG then BG:Destroy() end
-    end
-end
-
--- Noclip (Misc)
-local NoclipConn
-local function toggleNoclip(v)
-    getgenv().Config.Noclip = v
-    if NoclipConn then NoclipConn:Disconnect() end
-    if v then
-        NoclipConn = RS.Stepped:Connect(function()
-            local char = getChar()
-            for _, part in pairs(char:GetChildren()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
-            end
-        end)
-    end
-end
-
--- Infinite Jump (Misc)
-local InfJumpConn
-local function toggleInfJump(v)
-    getgenv().Config.InfJump = v
-    if InfJumpConn then InfJumpConn:Disconnect() end
-    if v then
-        InfJumpConn = UIS.JumpRequest:Connect(function() getHum():ChangeState("Jumping") end)
-    end
-end
-
--- Fullbright (Misc)
-local function toggleFullbright(v)
-    getgenv().Config.Fullbright = v
-    if v then
-        Lighting.Brightness = 2
-        Lighting.ClockTime = 14
-        Lighting.FogEnd = 9e9
-        Lighting.GlobalShadows = false
-        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-    else
-        Lighting.Brightness = 1
-        Lighting.ClockTime = 14
-        Lighting.FogEnd = 100000
-        Lighting.GlobalShadows = true
-        Lighting.OutdoorAmbient = Color3.fromRGB(50, 50, 50)
-    end
-end
-
--- Apply Stats (Misc)
-local function applyStats()
-    local hum = getHum()
-    hum.WalkSpeed = getgenv().Config.WalkSpeed
-    hum.JumpPower = getgenv().Config.JumpPower
-    hum.HipHeight = getgenv().Config.HipHeight
-end
-
--- Auto Farm Level (Farm - Basic strong loop 2026)
-local FarmConn
-local function toggleAutoFarmLevel(v)
-    getgenv().Config.AutoFarmLevel = v
-    if FarmConn then FarmConn:Disconnect() end
-    if v then
-        FarmConn = RS.Heartbeat:Connect(function()
-            pcall(function()
-                local enemies = workspace.Enemies:GetChildren()
-                for _, enemy in pairs(enemies) do
-                    if enemy:IsA("Model") and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
-                        local path = PathfindingService:CreatePath()
-                        path:ComputeAsync(getHRP().Position, enemy.HumanoidRootPart.Position)
-                        if path.Status == Enum.PathStatus.Success then
-                            for _, waypoint in pairs(path:GetWaypoints()) do
-                                getHum():MoveTo(waypoint.Position)
-                                task.wait(0.05)
-                            end
-                        end
-                        if getgenv().Config.BringMob then
-                            enemy.HumanoidRootPart.CFrame = getHRP().CFrame * CFrame.new(0, 0, -5)
-                        end
-                        if getgenv().Config.FastAttack then toggleFastAttack(true) end
-                        if getgenv().Config.BypassTP then
-                            getHRP().CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, -3)
-                        end
-                        break -- Farm 1 mob at a time
-                    end
-                end
-            end)
-            task.wait(getgenv().Config.FarmDelay)
-        end)
-    end
-end
-
--- Other Farm toggles
-local function toggleBringMob(v) getgenv().Config.BringMob = v end
-local function toggleBypassTP(v) getgenv().Config.BypassTP = v end
-local function toggleAutoMastery(v) getgenv().Config.AutoMastery = v end -- Add mastery logic if needed
-
--- Reapply on respawn
-lp.CharacterAdded:Connect(function()
-    task.wait(1)
-    applyStats()
-    if getgenv().Config.FastAttack then toggleFastAttack(true) end
-    if getgenv().Config.GodMode then toggleGodMode(true) end
-    if getgenv().Config.Fly then toggleFly(true) end
-    if getgenv().Config.Noclip then toggleNoclip(true) end
-    if getgenv().Config.InfJump then toggleInfJump(true) end
-    if getgenv().Config.AutoFarmLevel then toggleAutoFarmLevel(true) end
-end)
-
--- MAIN TAB
-Tabs.Main:AddToggle("FA", {Title = "Fast Attack (Bypass 2026)", Default = false, Callback = toggleFastAttack})
-Tabs.Main:AddToggle("God", {Title = "God Mode", Default = false, Callback = toggleGodMode})
-
--- FARM TAB
-Tabs.Farm:AddToggle("AF", {Title = "Auto Farm Level", Default = false, Callback = toggleAutoFarmLevel})
-Tabs.Farm:AddToggle("BringMob", {Title = "Bring Mob", Default = false, Callback = toggleBringMob})
-Tabs.Farm:AddToggle("BypassTP", {Title = "Bypass TP", Default = false, Callback = toggleBypassTP})
-Tabs.Farm:AddToggle("AutoMastery", {Title = "Auto Mastery", Default = false, Callback = toggleAutoMastery})
-
-Tabs.Farm:AddSlider("FarmDelay", {Title = "Farm Delay", Default = 0.3, Min = 0.1, Max = 1, Rounding = 2, Callback = function(v) getgenv().Config.FarmDelay = v end})
-
-Tabs.Farm:AddDropdown("Team", {Title = "Team", Values = {"Pirates", "Marines"}, Default = 1, Callback = function(v) getgenv().Config.Team = v end})
-
-Tabs.Farm:AddButton({Title = "Load Redz Hub (Advanced Farm)", Callback = function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/tlredz/Scripts/refs/heads/main/main.luau"))({JoinTeam = getgenv().Config.Team, Translator = true})
-end})
-
--- MISC TAB
-Tabs.Misc:AddToggle("Fly", {Title = "Fly (WASD + Space/Shift)", Default = false, Callback = toggleFly})
-Tabs.Misc:AddToggle("Noclip", {Title = "Noclip", Default = false, Callback = toggleNoclip})
-Tabs.Misc:AddToggle("InfJump", {Title = "Infinite Jump", Default = false, Callback = toggleInfJump})
-Tabs.Misc:AddToggle("Fullbright", {Title = "Fullbright", Default = false, Callback = toggleFullbright})
-
-Tabs.Misc:AddSlider("WalkSpeed", {Title = "WalkSpeed", Default = 16, Min = 16, Max = 500, Rounding = 1, Callback = function(v) getgenv().Config.WalkSpeed = v; applyStats() end})
-Tabs.Misc:AddSlider("JumpPower", {Title = "JumpPower", Default = 50, Min = 50, Max = 500, Rounding = 1, Callback = function(v) getgenv().Config.JumpPower = v; applyStats() end})
-Tabs.Misc:AddSlider("HipHeight", {Title = "HipHeight", Default = 0, Min = 0, Max = 100, Rounding = 1, Callback = function(v) getgenv().Config.HipHeight = v; applyStats() end})
-
-Tabs.Misc:AddButton({Title = "Rejoin", Callback = function() TS:Teleport(game.PlaceId, lp) end})
-Tabs.Misc:AddButton({Title = "Server Hop", Callback = function()
-    local servers = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
-    for _, v in pairs(servers.data) do
-        if v.playing < v.maxPlayers and v.id \~= game.JobId then
-            TS:TeleportToPlaceInstance(game.PlaceId, v.id)
-            break
-        end
-    end
-end})
-
--- Nút Pro (Vuông xanh lá, toggle mượt)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ProToggle"
 ScreenGui.Parent = game:GetService("CoreGui")
@@ -248,30 +25,109 @@ ScreenGui.DisplayOrder = 9999
 
 local TextButton = Instance.new("TextButton")
 TextButton.Parent = ScreenGui
-TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-TextButton.BackgroundTransparency = 0.3
+TextButton.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+TextButton.BackgroundTransparency = 0.4
 TextButton.Position = UDim2.new(0, 10, 0.5, 0)
-TextButton.Size = UDim2.new(0, 60, 0, 60)
+TextButton.Size = UDim2.new(0, 70, 0, 70)
 TextButton.Text = "Pro"
-TextButton.TextColor3 = Color3.fromRGB(0, 255, 0)
-TextButton.TextSize = 20
-TextButton.Font = Enum.Font.SourceSansBold
+TextButton.TextColor3 = Color3.fromRGB(0, 255, 150)
+TextButton.TextSize = 28
+TextButton.Font = Enum.Font.GothamBlack
 TextButton.Active = true
 TextButton.Draggable = true
 TextButton.TextWrapped = true
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.CornerRadius = UDim.new(0, 18)
 UICorner.Parent = TextButton
 
+-- Glow mạnh (UIStroke neon + Bloom toàn màn)
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(0, 255, 180)
+UIStroke.Thickness = 3
+UIStroke.Transparency = 0.2
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+UIStroke.Parent = TextButton
+
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 180)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 255, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 180))
+}
+UIGradient.Rotation = 0
+UIGradient.Parent = TextButton
+
+-- Bloom toàn màn cho glow wow
+local Bloom = Instance.new("BloomEffect")
+Bloom.Intensity = 2
+Bloom.Size = 28
+Bloom.Threshold = 0.9
+Bloom.Parent = game.Lighting
+
+local TweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+-- Hover animation
+TextButton.MouseEnter:Connect(function()
+    TweenService:Create(TextButton, tweenInfo, {Size = UDim2.new(0, 80, 0, 80), BackgroundTransparency = 0.2}):Play()
+    TweenService:Create(UIStroke, tweenInfo, {Thickness = 6, Transparency = 0}):Play()
+    TweenService:Create(UIGradient, TweenInfo.new(1.5, Enum.EasingStyle.Linear), {Rotation = 360}):Play() -- gradient quay
+end)
+
+TextButton.MouseLeave:Connect(function()
+    TweenService:Create(TextButton, tweenInfo, {Size = UDim2.new(0, 70, 0, 70), BackgroundTransparency = 0.4}):Play()
+    TweenService:Create(UIStroke, tweenInfo, {Thickness = 3, Transparency = 0.2}):Play()
+end)
+
+TextButton.MouseButton1Down:Connect(function()
+    TweenService:Create(TextButton, TweenInfo.new(0.15), {Size = UDim2.new(0, 65, 0, 65)}):Play()
+end)
+
+TextButton.MouseButton1Up:Connect(function()
+    TweenService:Create(TextButton, TweenInfo.new(0.2), {Size = UDim2.new(0, 80, 0, 80)}):Play()
+end)
+
+-- Particle sparkle wow khi click (nhiều hạt bay ra)
 TextButton.MouseButton1Click:Connect(function()
+    for i = 1, 12 do  -- 12 hạt sparkle
+        local sparkle = Instance.new("ImageLabel")
+        sparkle.Size = UDim2.new(0, math.random(20, 40), 0, math.random(20, 40))
+        sparkle.Position = UDim2.new(0.5, 0, 0.5, 0)
+        sparkle.AnchorPoint = Vector2.new(0.5, 0.5)
+        sparkle.BackgroundTransparency = 1
+        sparkle.Image = "rbxassetid://6031094667"  -- sparkle texture
+        sparkle.ImageColor3 = Color3.fromRGB(0, 255, math.random(150, 255))
+        sparkle.ImageTransparency = 0
+        sparkle.Parent = TextButton
+
+        local randomAngle = math.rad(math.random(0, 360))
+        local distance = math.random(80, 150)
+        local targetPos = UDim2.new(0.5, math.cos(randomAngle) * distance, 0.5, math.sin(randomAngle) * distance)
+
+        TweenService:Create(sparkle, TweenInfo.new(math.random(6,10)/10, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+            Position = targetPos,
+            Size = UDim2.new(0, 0, 0, 0),
+            ImageTransparency = 1,
+            Rotation = math.random(-360, 360)
+        }):Play()
+
+        task.delay(1, function() sparkle:Destroy() end)
+    end
+
     local vim = game:GetService("VirtualInputManager")
     vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
     task.wait(0.03)
     vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
 end)
 
--- Init
-applyStats()
+-- Shine loop nhẹ (gradient di chuyển liên tục)
+spawn(function()
+    while true do
+        UIGradient.Offset = Vector2.new(-1, 0)
+        TweenService:Create(UIGradient, TweenInfo.new(3, Enum.EasingStyle.Linear), {Offset = Vector2.new(1, 0)}):Play()
+        task.wait(3)
+    end
+end)
+
 Window:SelectTab(1)
-SaveManager:SetLibrary(Fluent)
