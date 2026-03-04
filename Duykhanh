@@ -1,10 +1,10 @@
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+local OrionLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/jannypanda/OrionLib-Mobile/main/Source.lua'))()
 
 local Window = OrionLib:MakeWindow({
-    Name = "Khanh Hub - Orion Edition", 
+    Name = "Khanh Hub - 2026 Mobile", 
     HidePremium = false, 
     SaveConfig = true, 
-    ConfigFolder = "KhanhOrion",
+    ConfigFolder = "KhanhConfig",
     IntroText = "Khanh Hub Loading..."
 })
 
@@ -36,13 +36,13 @@ local Tab1 = Window:MakeTab({
 })
 
 Tab1:AddToggle({
-    Name = "Silent Aim (Ngắm ngầm)",
+    Name = "Silent Aim",
     Default = false,
     Callback = function(Value) silentAimEnabled = Value end
 })
 
 Tab1:AddToggle({
-    Name = "Fast Attack (Đánh cực nhanh)",
+    Name = "Fast Attack",
     Default = false,
     Callback = function(Value)
         fastAttackEnabled = Value
@@ -50,14 +50,14 @@ Tab1:AddToggle({
             while fastAttackEnabled do
                 local tool = getChar() and getChar():FindFirstChildWhichIsA("Tool")
                 if tool then tool:Activate() end
-                task.wait(0.001)
+                task.wait(0.01)
             end
         end)
     end
 })
 
 Tab1:AddButton({
-    Name = "Áp sát mục tiêu gần nhất",
+    Name = "Áp sát mục tiêu",
     Callback = function()
         local target = nil
         local dist = math.huge
@@ -67,35 +67,19 @@ Tab1:AddButton({
                 if d < dist then dist = d target = p.Character end
             end
         end
-        if target then
-            getHRP().CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
-        end
+        if target then getHRP().CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3) end
     end
 })
 
 local Tab2 = Window:MakeTab({
-    Name = "Combat Pro",
+    Name = "Combat",
     Icon = "rbxassetid://4483362458",
     PremiumOnly = false
 })
 
-Tab2:AddToggle({
-    Name = "Kill Aura (Tự đánh)",
-    Default = false,
-    Callback = function(Value) killAuraEnabled = Value end
-})
-
-Tab2:AddToggle({
-    Name = "Anti-Stun (Chống khựng)",
-    Default = false,
-    Callback = function(Value) antiStunEnabled = Value end
-})
-
-Tab2:AddToggle({
-    Name = "No Slowdown",
-    Default = false,
-    Callback = function(Value) noSlowdownEnabled = Value end
-})
+Tab2:AddToggle({ Name = "Kill Aura", Default = false, Callback = function(Value) killAuraEnabled = Value end })
+Tab2:AddToggle({ Name = "Anti-Stun", Default = false, Callback = function(Value) antiStunEnabled = Value end })
+Tab2:AddToggle({ Name = "No Slowdown", Default = false, Callback = function(Value) noSlowdownEnabled = Value end })
 
 local Tab3 = Window:MakeTab({
     Name = "Movement",
@@ -103,39 +87,10 @@ local Tab3 = Window:MakeTab({
     PremiumOnly = false
 })
 
-Tab3:AddSlider({
-    Name = "Tốc độ chạy",
-    Min = 16,
-    Max = 500,
-    Default = 16,
-    Color = Color3.fromRGB(255,255,255),
-    Increment = 1,
-    ValueName = "Speed",
-    Callback = function(Value) walkSpeed = Value end    
-})
-
-Tab3:AddSlider({
-    Name = "Độ cao nhảy",
-    Min = 50,
-    Max = 1000,
-    Default = 50,
-    Color = Color3.fromRGB(255,255,255),
-    Increment = 1,
-    ValueName = "Jump",
-    Callback = function(Value) jumpPower = Value end    
-})
-
-Tab3:AddToggle({
-    Name = "Nhảy vô hạn (Inf Jump)",
-    Default = false,
-    Callback = function(Value) infJumpEnabled = Value end
-})
-
-Tab3:AddToggle({
-    Name = "Xuyên tường (Noclip)",
-    Default = false,
-    Callback = function(Value) noclipEnabled = Value end
-})
+Tab3:AddSlider({ Name = "Speed", Min = 16, Max = 500, Default = 16, Increment = 1, Callback = function(V) walkSpeed = V end })
+Tab3:AddSlider({ Name = "Jump", Min = 50, Max = 1000, Default = 50, Increment = 1, Callback = function(V) jumpPower = V end })
+Tab3:AddToggle({ Name = "Inf Jump", Default = false, Callback = function(V) infJumpEnabled = V end })
+Tab3:AddToggle({ Name = "Noclip", Default = false, Callback = function(V) noclipEnabled = V end })
 
 UserInputService.JumpRequest:Connect(function()
    if infJumpEnabled then
@@ -165,10 +120,7 @@ RunService.Heartbeat:Connect(function()
       local tHRP = target.HumanoidRootPart
       if (tHRP.Position - getHRP().Position).Magnitude <= 30 then
          for _, r in ipairs(tool:GetDescendants()) do
-            if r:IsA("RemoteEvent") then
-               r:FireServer(tHRP.Position)
-               r:FireServer(target)
-            end
+            if r:IsA("RemoteEvent") then r:FireServer(tHRP.Position) r:FireServer(target) end
          end
       end
    end
@@ -178,9 +130,7 @@ RunService.Stepped:Connect(function()
    local char = getChar()
    if not char then return end
    if noclipEnabled then
-      for _, p in ipairs(char:GetDescendants()) do
-         if p:IsA("BasePart") then p.CanCollide = false end
-      end
+      for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
    end
    local hum = getHum()
    if hum then
@@ -189,9 +139,7 @@ RunService.Stepped:Connect(function()
       hum.UseJumpPower = true
       if antiStunEnabled or noSlowdownEnabled then
          hum.PlatformStand = false
-         if hum:GetState() == Enum.HumanoidStateType.Ragdoll then
-            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-         end
+         if hum:GetState() == Enum.HumanoidStateType.Ragdoll then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
       end
    end
 end)
