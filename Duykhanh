@@ -23,110 +23,125 @@ ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 9999
 
-local TextButton = Instance.new("TextButton")
-TextButton.Parent = ScreenGui
-TextButton.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-TextButton.BackgroundTransparency = 0.4
-TextButton.Position = UDim2.new(0, 10, 0.5, 0)
-TextButton.Size = UDim2.new(0, 70, 0, 70)
-TextButton.Text = "Pro"
-TextButton.TextColor3 = Color3.fromRGB(0, 255, 150)
-TextButton.TextSize = 28
-TextButton.Font = Enum.Font.GothamBlack
-TextButton.Active = true
-TextButton.Draggable = true
-TextButton.TextWrapped = true
+local Frame = Instance.new("Frame")
+Frame.Parent = ScreenGui
+Frame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+Frame.BackgroundTransparency = 0.45
+Frame.Position = UDim2.new(0, 10, 0.5, -35)
+Frame.Size = UDim2.new(0, 80, 0, 80)
+Frame.Active = true
+Frame.Draggable = true
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 18)
-UICorner.Parent = TextButton
+UICorner.CornerRadius = UDim.new(1, 0)
+UICorner.Parent = Frame
 
--- Glow mạnh (UIStroke neon + Bloom toàn màn)
+local TextLabel = Instance.new("TextLabel")
+TextLabel.Parent = Frame
+TextLabel.Size = UDim2.new(1, 0, 1, 0)
+TextLabel.BackgroundTransparency = 1
+TextLabel.Text = "Pro"
+TextLabel.TextColor3 = Color3.fromRGB(0, 255, 180)
+TextLabel.TextSize = 32
+TextLabel.Font = Enum.Font.GothamBlack
+TextLabel.TextStrokeTransparency = 0.8
+TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 255, 180)
+
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Color = Color3.fromRGB(0, 255, 180)
-UIStroke.Thickness = 3
-UIStroke.Transparency = 0.2
+UIStroke.Thickness = 4
+UIStroke.Transparency = 0.3
 UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-UIStroke.Parent = TextButton
+UIStroke.Parent = Frame
 
 local UIGradient = Instance.new("UIGradient")
 UIGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 180)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 255, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 180))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 200)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120, 255, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 200))
 }
-UIGradient.Rotation = 0
-UIGradient.Parent = TextButton
+UIGradient.Rotation = 45
+UIGradient.Parent = Frame
 
--- Bloom toàn màn cho glow wow
-local Bloom = Instance.new("BloomEffect")
-Bloom.Intensity = 2
-Bloom.Size = 28
-Bloom.Threshold = 0.9
-Bloom.Parent = game.Lighting
+local Bloom = Instance.new("BloomEffect", game.Lighting)
+Bloom.Intensity = 2.2
+Bloom.Size = 32
+Bloom.Threshold = 0.85
 
 local TweenService = game:GetService("TweenService")
-local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
--- Hover animation
-TextButton.MouseEnter:Connect(function()
-    TweenService:Create(TextButton, tweenInfo, {Size = UDim2.new(0, 80, 0, 80), BackgroundTransparency = 0.2}):Play()
-    TweenService:Create(UIStroke, tweenInfo, {Thickness = 6, Transparency = 0}):Play()
-    TweenService:Create(UIGradient, TweenInfo.new(1.5, Enum.EasingStyle.Linear), {Rotation = 360}):Play() -- gradient quay
+Frame.MouseEnter:Connect(function()
+    TweenService:Create(Frame, tweenInfo, {Size = UDim2.new(0, 92, 0, 92)}):Play()
+    TweenService:Create(UIStroke, tweenInfo, {Thickness = 8, Transparency = 0}):Play()
+    TweenService:Create(UIGradient, TweenInfo.new(2, Enum.EasingStyle.Linear), {Rotation = 405}):Play()
 end)
 
-TextButton.MouseLeave:Connect(function()
-    TweenService:Create(TextButton, tweenInfo, {Size = UDim2.new(0, 70, 0, 70), BackgroundTransparency = 0.4}):Play()
-    TweenService:Create(UIStroke, tweenInfo, {Thickness = 3, Transparency = 0.2}):Play()
+Frame.MouseLeave:Connect(function()
+    TweenService:Create(Frame, tweenInfo, {Size = UDim2.new(0, 80, 0, 80)}):Play()
+    TweenService:Create(UIStroke, tweenInfo, {Thickness = 4, Transparency = 0.3}):Play()
 end)
 
-TextButton.MouseButton1Down:Connect(function()
-    TweenService:Create(TextButton, TweenInfo.new(0.15), {Size = UDim2.new(0, 65, 0, 65)}):Play()
-end)
-
-TextButton.MouseButton1Up:Connect(function()
-    TweenService:Create(TextButton, TweenInfo.new(0.2), {Size = UDim2.new(0, 80, 0, 80)}):Play()
-end)
-
--- Particle sparkle wow khi click (nhiều hạt bay ra)
-TextButton.MouseButton1Click:Connect(function()
-    for i = 1, 12 do  -- 12 hạt sparkle
-        local sparkle = Instance.new("ImageLabel")
-        sparkle.Size = UDim2.new(0, math.random(20, 40), 0, math.random(20, 40))
-        sparkle.Position = UDim2.new(0.5, 0, 0.5, 0)
-        sparkle.AnchorPoint = Vector2.new(0.5, 0.5)
-        sparkle.BackgroundTransparency = 1
-        sparkle.Image = "rbxassetid://6031094667"  -- sparkle texture
-        sparkle.ImageColor3 = Color3.fromRGB(0, 255, math.random(150, 255))
-        sparkle.ImageTransparency = 0
-        sparkle.Parent = TextButton
-
-        local randomAngle = math.rad(math.random(0, 360))
-        local distance = math.random(80, 150)
-        local targetPos = UDim2.new(0.5, math.cos(randomAngle) * distance, 0.5, math.sin(randomAngle) * distance)
-
-        TweenService:Create(sparkle, TweenInfo.new(math.random(6,10)/10, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
-            Position = targetPos,
-            Size = UDim2.new(0, 0, 0, 0),
-            ImageTransparency = 1,
-            Rotation = math.random(-360, 360)
-        }):Play()
-
-        task.delay(1, function() sparkle:Destroy() end)
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        TweenService:Create(Frame, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 74, 0, 74)}):Play()
     end
-
-    local vim = game:GetService("VirtualInputManager")
-    vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
-    task.wait(0.03)
-    vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
 end)
 
--- Shine loop nhẹ (gradient di chuyển liên tục)
+Frame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        TweenService:Create(Frame, TweenInfo.new(0.25, Enum.EasingStyle.Back), {Size = UDim2.new(0, 92, 0, 92)}):Play()
+    end
+end)
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        -- Hiệu ứng âm thanh khi click
+        local Sound = Instance.new("Sound")
+        Sound.SoundId = "rbxassetid://9119707214"  -- âm thanh click neon / sci-fi (miễn phí Roblox)
+        Sound.Volume = 0.6
+        Sound.PlayOnRemove = false
+        Sound.Parent = Frame
+        Sound:Play()
+        task.delay(2, function() Sound:Destroy() end)
+
+        for i = 1, 18 do
+            local particle = Instance.new("ImageLabel")
+            particle.Size = UDim2.new(0, math.random(18, 36), 0, math.random(18, 36))
+            particle.Position = UDim2.new(0.5, 0, 0.5, 0)
+            particle.AnchorPoint = Vector2.new(0.5, 0.5)
+            particle.BackgroundTransparency = 1
+            particle.Image = "rbxassetid://6031094667"
+            particle.ImageColor3 = Color3.fromHSV(math.random(), 0.8, 1)
+            particle.ImageTransparency = 0.2
+            particle.Parent = Frame
+
+            local angle = math.rad(math.random(0, 360))
+            local dist = math.random(90, 180)
+            local target = UDim2.new(0.5, math.cos(angle) * dist, 0.5, math.sin(angle) * dist)
+
+            TweenService:Create(particle, TweenInfo.new(0.8 + math.random()/2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+                Position = target,
+                Size = UDim2.new(0, 0, 0, 0),
+                ImageTransparency = 1,
+                Rotation = math.random(-720, 720)
+            }):Play()
+
+            task.delay(1.3, function() particle:Destroy() end)
+        end
+
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+        task.wait(0.03)
+        vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
+    end
+end)
+
 spawn(function()
     while true do
-        UIGradient.Offset = Vector2.new(-1, 0)
-        TweenService:Create(UIGradient, TweenInfo.new(3, Enum.EasingStyle.Linear), {Offset = Vector2.new(1, 0)}):Play()
-        task.wait(3)
+        UIGradient.Offset = Vector2.new(-1.5, 0)
+        TweenService:Create(UIGradient, TweenInfo.new(4, Enum.EasingStyle.Linear), {Offset = Vector2.new(1.5, 0)}):Play()
+        task.wait(4)
     end
 end)
 
