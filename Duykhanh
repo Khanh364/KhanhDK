@@ -3,7 +3,7 @@ local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/d
 
 local Window = Fluent:CreateWindow({
     Title = "KhanhUltimate",
-    SubTitle = "Skibidi",
+    SubTitle = "skibidi",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
@@ -16,5 +16,36 @@ local Tabs = {
     Farm = Window:AddTab({ Title = "Farm", Icon = "swords" }),
     Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
 }
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ProToggle"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 9999
+
+local TextButton = Instance.new("TextButton")
+TextButton.Parent = ScreenGui
+TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+TextButton.BackgroundTransparency = 0.3
+TextButton.Position = UDim2.new(0, 10, 0.5, 0)
+TextButton.Size = UDim2.new(0, 60, 0, 60)
+TextButton.Text = "Pro"
+TextButton.TextColor3 = Color3.fromRGB(0, 255, 0)
+TextButton.TextSize = 20
+TextButton.Font = Enum.Font.SourceSansBold
+TextButton.Active = true
+TextButton.Draggable = true
+TextButton.TextWrapped = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = TextButton
+
+TextButton.MouseButton1Click:Connect(function()
+    local vim = game:GetService("VirtualInputManager")
+    vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+    task.wait(0.03)
+    vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
+end)
 
 Window:SelectTab(1)
