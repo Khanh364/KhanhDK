@@ -19,6 +19,7 @@ local aimbotEnabled, aimbotPart, aimbotFOV, aimbotSmooth = false, "Head", 150, 5
 local killAuraEnabled, killAuraRange = false, 20
 local hitboxEnabled, hitboxSize = false, 15
 local autoParry, antiStun = false, false
+local autoV3, autoV4 = false, false
 local walkSpeed, jumpPower = 16, 50
 
 local function getCharacter() return LocalPlayer.Character end
@@ -90,6 +91,18 @@ TabPVP:CreateSlider({
 })
 
 TabPVP:CreateToggle({
+   Name = "Auto Activate V3",
+   CurrentValue = false,
+   Callback = function(V) autoV3 = V end
+})
+
+TabPVP:CreateToggle({
+   Name = "Auto Activate V4",
+   CurrentValue = false,
+   Callback = function(V) autoV4 = V end
+})
+
+TabPVP:CreateToggle({
    Name = "Auto Parry / Block",
    CurrentValue = false,
    Callback = function(V) autoParry = V end
@@ -143,6 +156,13 @@ end)
 
 task.spawn(function()
    while task.wait(0.1) do
+      if autoV3 then
+         pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateAbility") end)
+      end
+      if autoV4 then
+         pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateTransformation") end)
+      end
+      
       local myHRP = getHRP()
       if not myHRP then continue end
 
