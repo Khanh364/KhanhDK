@@ -1,59 +1,75 @@
-local RedzLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/RHEZAKUN/RedzLib/main/Source.lua"))()
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 
-local Window = RedzLib:MakeWindow({
-    Title = "Khanh Hub - DuyKhanh V6",
-    SubTitle = "Sửa Lỗi Không Hiện Menu",
-    HeaderColor = Color3.fromRGB(255, 0, 0)
+local Window = Fluent:CreateWindow({
+    Title = "Khánh Hub Ultimate 🍉",
+    SubTitle = "2026",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Light",
+    MinimizeKey = Enum.KeyCode.RightControl
 })
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
+    Farm = Window:AddTab({ Title = "Farm", Icon = "swords" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
+}
 
-local cfg = { speed = 16, jump = 50, aura = false, infj = false }
+local lp = game.Players.LocalPlayer
+getgenv().Config = {}
 
-local Tab = Window:CreateTab("Main", "home")
-
-Tab:AddToggle("Kill Aura + Fast Attack", false, function(v)
-    cfg.aura = v
+-- Fast Attack Logic
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+mt.__namecall = newcclosure(function(self, ...)
+    if getgenv().Config.FastAttack and getnamecallmethod() == "FireServer" and self.Name == "MeleeDamage" then
+        for i = 1, 5 do oldNamecall(self, ...) end
+    end
+    return oldNamecall(self, ...)
 end)
+setreadonly(mt, true)
 
-Tab:AddSlider("Speed", 16, 500, 16, function(v)
-    cfg.speed = v
-end)
-
-Tab:AddSlider("Jump", 50, 1000, 50, function(v)
-    cfg.jump = v
-end)
-
-Tab:AddToggle("Infinite Jump", false, function(v)
-    cfg.infj = v
-end)
-
--- Logic vận hành (Chống văng, chống lỗi)
-RunService.Stepped:Connect(function()
-    pcall(function()
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            local hum = LocalPlayer.Character.Humanoid
-            hum.WalkSpeed = cfg.speed
-            hum.JumpPower = cfg.jump
-            hum.UseJumpPower = true
-            
-            if cfg.aura then
-                local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                if tool then
-                    tool:Activate()
-                    for _, v in pairs(tool:GetDescendants()) do
-                        if v:IsA("RemoteEvent") then v:FireServer() end
-                    end
-                end
-            end
+-- Auto Click
+spawn(function()
+    while task.wait(0.1) do
+        if getgenv().Config.AutoFarm then
+            game:GetService("VirtualUser"):CaptureController()
+            game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
         end
-    end)
-end)
-
-game:GetService("UserInputService").JumpRequest:Connect(function()
-    if cfg.infj and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
+
+-- UI Toggles
+Tabs.Main:AddToggle("FA", {Title = "Fast Attack", Default = false, Callback = function(v) getgenv().Config.FastAttack = v end})
+Tabs.Farm:AddToggle("AF", {Title = "Auto Farm", Default = false, Callback = function(v) getgenv().Config.AutoFarm = v end})
+
+-- Nút Skibidi
+local ScreenGui = Instance.new("ScreenGui")
+local TextButton = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Name = "SkibidiToggle"
+ScreenGui.Parent = lp:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+TextButton.Parent = ScreenGui
+TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+TextButton.BackgroundTransparency = 0.3
+TextButton.Position = UDim2.new(0, 10, 0.5, 0)
+TextButton.Size = UDim2.new(0, 80, 0, 30)
+TextButton.Text = "skibidi"
+TextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TextButton.TextSize = 18
+TextButton.Draggable = true
+
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = TextButton
+
+TextButton.MouseButton1Click:Connect(function()
+    game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+end)
+
+Window:SelectTab(1)
