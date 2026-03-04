@@ -1,12 +1,20 @@
-local OrionLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/jannypanda/OrionLib-Mobile/main/Source.lua'))()
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
-local Window = OrionLib:MakeWindow({
-    Name = "Khanh Hub - 2026 Mobile", 
-    HidePremium = false, 
-    SaveConfig = true, 
-    ConfigFolder = "KhanhConfig",
-    IntroText = "Khanh Hub Loading..."
+local Window = Fluent:CreateWindow({
+    Title = "Khanh Hub - Fluent Edition",
+    SubTitle = "Mobile 2026",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightControl
 })
+
+local Tabs = {
+    Bounty = Window:AddTab({ Title = "Bounty Hunter", Icon = "target" }),
+    Combat = Window:AddTab({ Title = "Combat Pro", Icon = "swords" }),
+    Movement = Window:AddTab({ Title = "Movement", Icon = "zap" })
+}
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -14,6 +22,7 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+local Options = Fluent.Options
 local silentAimEnabled = false
 local killAuraEnabled = false
 local fastAttackEnabled = false
@@ -29,35 +38,22 @@ local function getChar() return LocalPlayer.Character end
 local function getHum() return getChar() and getChar():FindFirstChildWhichIsA("Humanoid") end
 local function getHRP() return getChar() and getChar():FindFirstChild("HumanoidRootPart") end
 
-local Tab1 = Window:MakeTab({
-    Name = "Bounty Hunter",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
+-- BOUNTY TAB
+Tabs.Bounty:AddToggle("SilentAim", {Title = "Silent Aim", Default = false}):OnChanged(function(Value) silentAimEnabled = Value end)
 
-Tab1:AddToggle({
-    Name = "Silent Aim",
-    Default = false,
-    Callback = function(Value) silentAimEnabled = Value end
-})
+Tabs.Bounty:AddToggle("FastAttack", {Title = "Fast Attack", Default = false}):OnChanged(function(Value)
+    fastAttackEnabled = Value
+    task.spawn(function()
+        while fastAttackEnabled do
+            local tool = getChar() and getChar():FindFirstChildWhichIsA("Tool")
+            if tool then tool:Activate() end
+            task.wait(0.01)
+        end
+    end)
+end)
 
-Tab1:AddToggle({
-    Name = "Fast Attack",
-    Default = false,
-    Callback = function(Value)
-        fastAttackEnabled = Value
-        task.spawn(function()
-            while fastAttackEnabled do
-                local tool = getChar() and getChar():FindFirstChildWhichIsA("Tool")
-                if tool then tool:Activate() end
-                task.wait(0.01)
-            end
-        end)
-    end
-})
-
-Tab1:AddButton({
-    Name = "Áp sát mục tiêu",
+Tabs.Bounty:AddButton({
+    Title = "Áp Sát Mục Tiêu",
     Callback = function()
         local target = nil
         local dist = math.huge
@@ -71,77 +67,68 @@ Tab1:AddButton({
     end
 })
 
-local Tab2 = Window:MakeTab({
-    Name = "Combat",
-    Icon = "rbxassetid://4483362458",
-    PremiumOnly = false
-})
+-- COMBAT TAB
+Tabs.Combat:AddToggle("KillAura", {Title = "Kill Aura", Default = false}):OnChanged(function(Value) killAuraEnabled = Value end)
+Tabs.Combat:AddToggle("AntiStun", {Title = "Anti-Stun", Default = false}):OnChanged(function(Value) antiStunEnabled = Value end)
+Tabs.Combat:AddToggle("NoSlow", {Title = "No Slowdown", Default = false}):OnChanged(function(Value) noSlowdownEnabled = Value end)
 
-Tab2:AddToggle({ Name = "Kill Aura", Default = false, Callback = function(Value) killAuraEnabled = Value end })
-Tab2:AddToggle({ Name = "Anti-Stun", Default = false, Callback = function(Value) antiStunEnabled = Value end })
-Tab2:AddToggle({ Name = "No Slowdown", Default = false, Callback = function(Value) noSlowdownEnabled = Value end })
-
-local Tab3 = Window:MakeTab({
-    Name = "Movement",
-    Icon = "rbxassetid://4483362748",
-    PremiumOnly = false
-})
-
-Tab3:AddSlider({ Name = "Speed", Min = 16, Max = 500, Default = 16, Increment = 1, Callback = function(V) walkSpeed = V end })
-Tab3:AddSlider({ Name = "Jump", Min = 50, Max = 1000, Default = 50, Increment = 1, Callback = function(V) jumpPower = V end })
-Tab3:AddToggle({ Name = "Inf Jump", Default = false, Callback = function(V) infJumpEnabled = V end })
-Tab3:AddToggle({ Name = "Noclip", Default = false, Callback = function(V) noclipEnabled = V end })
+-- MOVEMENT TAB
+Tabs.Movement:AddSlider("Speed", {Title = "Tốc độ chạy", Default = 16, Min = 16, Max = 500, Rounding = 1, Callback = function(V) walkSpeed = V end})
+Tabs.Movement:AddSlider("Jump", {Title = "Độ cao nhảy", Default = 50, Min = 50, Max = 1000, Rounding = 1, Callback = function(V) jumpPower = V end})
+Tabs.Movement:AddToggle("InfJump", {Title = "Nhảy vô hạn", Default = false}):OnChanged(function(V) infJumpEnabled = V end)
+Tabs.Movement:AddToggle("Noclip", {Title = "Xuyên tường", Default = false}):OnChanged(function(V) noclipEnabled = V end)
 
 UserInputService.JumpRequest:Connect(function()
-   if infJumpEnabled then
-      local hum = getHum()
-      if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-   end
+    if infJumpEnabled then
+        local hum = getHum()
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
 end)
 
 RunService.Heartbeat:Connect(function()
-   local char = getChar()
-   if not char or not getHRP() then return end
-   local tool = char:FindFirstChildWhichIsA("Tool")
-   
-   local target = nil
-   local dist_f = silentAimFOV
-   for _, p in ipairs(Players:GetPlayers()) do
-      if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-         local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
-         if onScreen then
-            local d = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-            if d < dist_f then dist_f = d target = p.Character end
-         end
-      end
-   end
+    local char = getChar()
+    if not char or not getHRP() then return end
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    
+    local target = nil
+    local dist_f = silentAimFOV
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local d = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                if d < dist_f then dist_f = d target = p.Character end
+            end
+        end
+    end
 
-   if target and tool and (silentAimEnabled or killAuraEnabled) then
-      local tHRP = target.HumanoidRootPart
-      if (tHRP.Position - getHRP().Position).Magnitude <= 30 then
-         for _, r in ipairs(tool:GetDescendants()) do
-            if r:IsA("RemoteEvent") then r:FireServer(tHRP.Position) r:FireServer(target) end
-         end
-      end
-   end
+    if target and tool and (silentAimEnabled or killAuraEnabled) then
+        local tHRP = target.HumanoidRootPart
+        if (tHRP.Position - getHRP().Position).Magnitude <= 30 then
+            for _, r in ipairs(tool:GetDescendants()) do
+                if r:IsA("RemoteEvent") then r:FireServer(tHRP.Position) r:FireServer(target) end
+            end
+        end
+    end
 end)
 
 RunService.Stepped:Connect(function()
-   local char = getChar()
-   if not char then return end
-   if noclipEnabled then
-      for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
-   end
-   local hum = getHum()
-   if hum then
-      hum.WalkSpeed = walkSpeed
-      hum.JumpPower = jumpPower
-      hum.UseJumpPower = true
-      if antiStunEnabled or noSlowdownEnabled then
-         hum.PlatformStand = false
-         if hum:GetState() == Enum.HumanoidStateType.Ragdoll then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
-      end
-   end
+    local char = getChar()
+    if not char then return end
+    if noclipEnabled then
+        for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+    end
+    local hum = getHum()
+    if hum then
+        hum.WalkSpeed = walkSpeed
+        hum.JumpPower = jumpPower
+        hum.UseJumpPower = true
+        if antiStunEnabled or noSlowdownEnabled then
+            hum.PlatformStand = false
+            if hum:GetState() == Enum.HumanoidStateType.Ragdoll then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
+        end
+    end
 end)
 
-OrionLib:Init()
+Window:SelectTab(1)
+Fluent:Notify({Title = "Khanh Hub", Content = "Fluent Loaded!", Duration = 5})
