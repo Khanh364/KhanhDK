@@ -1,134 +1,96 @@
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local RedzLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/RHEZAKUN/RedzLib/main/Source.lua"))()
 
-local Window = Fluent:CreateWindow({
-    Title = "Khanh Hub - Fluent Edition",
-    SubTitle = "Mobile 2026",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = true,
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.RightControl
+local Window = RedzLib:MakeWindow({
+    Title = "Khanh Hub - V3 (Logic Optimized)",
+    SubTitle = "Fixed for Mobile 2026",
+    HeaderColor = Color3.fromRGB(255, 50, 50)
 })
-
-local Tabs = {
-    Bounty = Window:AddTab({ Title = "Bounty Hunter", Icon = "target" }),
-    Combat = Window:AddTab({ Title = "Combat Pro", Icon = "swords" }),
-    Movement = Window:AddTab({ Title = "Movement", Icon = "zap" })
-}
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
-local Options = Fluent.Options
+-- Variables
 local silentAimEnabled = false
 local killAuraEnabled = false
 local fastAttackEnabled = false
-local noSlowdownEnabled = false
-local infJumpEnabled = false
-local noclipEnabled = false
-local antiStunEnabled = false
 local walkSpeed = 16
 local jumpPower = 50
-local silentAimFOV = 150
 
-local function getChar() return LocalPlayer.Character end
-local function getHum() return getChar() and getChar():FindFirstChildWhichIsA("Humanoid") end
-local function getHRP() return getChar() and getChar():FindFirstChild("HumanoidRootPart") end
-
--- BOUNTY TAB
-Tabs.Bounty:AddToggle("SilentAim", {Title = "Silent Aim", Default = false}):OnChanged(function(Value) silentAimEnabled = Value end)
-
-Tabs.Bounty:AddToggle("FastAttack", {Title = "Fast Attack", Default = false}):OnChanged(function(Value)
-    fastAttackEnabled = Value
-    task.spawn(function()
-        while fastAttackEnabled do
-            local tool = getChar() and getChar():FindFirstChildWhichIsA("Tool")
-            if tool then tool:Activate() end
-            task.wait(0.01)
-        end
-    end)
-end)
-
-Tabs.Bounty:AddButton({
-    Title = "Áp Sát Mục Tiêu",
-    Callback = function()
-        local target = nil
-        local dist = math.huge
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local d = (p.Character.HumanoidRootPart.Position - getHRP().Position).Magnitude
-                if d < dist then dist = d target = p.Character end
-            end
-        end
-        if target then getHRP().CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3) end
-    end
-})
-
--- COMBAT TAB
-Tabs.Combat:AddToggle("KillAura", {Title = "Kill Aura", Default = false}):OnChanged(function(Value) killAuraEnabled = Value end)
-Tabs.Combat:AddToggle("AntiStun", {Title = "Anti-Stun", Default = false}):OnChanged(function(Value) antiStunEnabled = Value end)
-Tabs.Combat:AddToggle("NoSlow", {Title = "No Slowdown", Default = false}):OnChanged(function(Value) noSlowdownEnabled = Value end)
-
--- MOVEMENT TAB
-Tabs.Movement:AddSlider("Speed", {Title = "Tốc độ chạy", Default = 16, Min = 16, Max = 500, Rounding = 1, Callback = function(V) walkSpeed = V end})
-Tabs.Movement:AddSlider("Jump", {Title = "Độ cao nhảy", Default = 50, Min = 50, Max = 1000, Rounding = 1, Callback = function(V) jumpPower = V end})
-Tabs.Movement:AddToggle("InfJump", {Title = "Nhảy vô hạn", Default = false}):OnChanged(function(V) infJumpEnabled = V end)
-Tabs.Movement:AddToggle("Noclip", {Title = "Xuyên tường", Default = false}):OnChanged(function(V) noclipEnabled = V end)
-
-UserInputService.JumpRequest:Connect(function()
-    if infJumpEnabled then
-        local hum = getHum()
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-    end
-end)
-
-RunService.Heartbeat:Connect(function()
-    local char = getChar()
-    if not char or not getHRP() then return end
-    local tool = char:FindFirstChildWhichIsA("Tool")
-    
+-- Hàm tìm đối thủ gần nhất (Fix lỗi nhận diện)
+local function getClosestPlayer()
     local target = nil
-    local dist_f = silentAimFOV
+    local dist = 30 -- Tầm đánh 30 studs
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
-            if onScreen then
-                local d = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                if d < dist_f then dist_f = d target = p.Character end
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid").Health > 0 then
+            local d = (p.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if d < dist then
+                dist = d
+                target = p.Character
             end
         end
     end
+    return target
+end
 
-    if target and tool and (silentAimEnabled or killAuraEnabled) then
-        local tHRP = target.HumanoidRootPart
-        if (tHRP.Position - getHRP().Position).Magnitude <= 30 then
-            for _, r in ipairs(tool:GetDescendants()) do
-                if r:IsA("RemoteEvent") then r:FireServer(tHRP.Position) r:FireServer(target) end
-            end
-        end
-    end
+-- TAB 1: PVP LOGIC (Đã sửa lại hoàn toàn)
+local Tab1 = Window:CreateTab("Bounty Hunter", "target")
+
+Tab1:AddToggle("Silent Aim + Kill Aura", false, function(Value)
+    killAuraEnabled = Value
+    silentAimEnabled = Value
 end)
 
-RunService.Stepped:Connect(function()
-    local char = getChar()
+Tab1:AddToggle("Fast Attack (Super Speed)", false, function(Value)
+    fastAttackEnabled = Value
+end)
+
+-- TAB 2: MOVEMENT
+local Tab2 = Window:CreateTab("Movement", "zap")
+Tab2:AddSlider("Tốc độ", 16, 500, 16, function(V) walkSpeed = V end)
+Tab2:AddSlider("Nhảy cao", 50, 1000, 50, function(V) jumpPower = V end)
+Tab2:AddToggle("Nhảy vô hạn", false, function(V) _G.InfJ = V end)
+
+-- [VÒNG LẶP XỬ LÝ CHÍNH - ĐÃ KIỂM TRA]
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
     if not char then return end
-    if noclipEnabled then
-        for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
-    end
-    local hum = getHum()
+    
+    -- Fix Speed & Jump (Ép chỉ số liên tục)
+    local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then
         hum.WalkSpeed = walkSpeed
         hum.JumpPower = jumpPower
         hum.UseJumpPower = true
-        if antiStunEnabled or noSlowdownEnabled then
-            hum.PlatformStand = false
-            if hum:GetState() == Enum.HumanoidStateType.Ragdoll then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
+    end
+
+    -- Fix Fast Attack & Kill Aura
+    if fastAttackEnabled or killAuraEnabled then
+        local target = getClosestPlayer()
+        local tool = char:FindFirstChildOfClass("Tool")
+        
+        if target and tool then
+            -- 1. Kích hoạt đòn đánh client
+            tool:Activate()
+            
+            -- 2. Ép sát thương lên Server (Quét Remote)
+            for _, v in pairs(tool:GetDescendants()) do
+                if v:IsA("RemoteEvent") then
+                    -- Gửi dữ liệu tới vị trí địch
+                    v:FireServer(target.HumanoidRootPart.Position)
+                    v:FireServer(target)
+                end
+            end
         end
     end
 end)
 
-Window:SelectTab(1)
-Fluent:Notify({Title = "Khanh Hub", Content = "Fluent Loaded!", Duration = 5})
+-- Fix Nhảy vô hạn
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if _G.InfJ and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+print("Khanh Hub V3: Logic Checked & Loaded")
