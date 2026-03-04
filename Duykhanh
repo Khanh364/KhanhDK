@@ -6,7 +6,7 @@ local Window = Rayfield:CreateWindow({
    LoadingTitle = "skibidi",
    LoadingSubtitle = "DK",
    ShowText = "Khanh Hub",
-   Theme = "pale white ",
+   Theme = "Default",
    ToggleUIKeybind = "K",
    DisableRayfieldPrompts = false,
    DisableBuildWarnings = false,
@@ -61,7 +61,6 @@ local autoQuestEnabled = false
 local autoMasteryEnabled = false
 local autoEatEnabled = false
 local selectedMob = ""
-local selectedFruit = "None"
 local farmConnection = nil
 local questConnection = nil
 local masteryConnection = nil
@@ -539,7 +538,7 @@ TabESP:CreateToggle({
 local TabFarm = Window:CreateTab("FARM", "wheat")
 
 TabFarm:CreateInput({
-   Name = "Mob Name (de trong = tat ca)",
+   Name = "Mob Name",
    CurrentValue = "",
    PlaceholderText = "Vi du: Monkey, Pirate...",
    RemoveTextAfterFocusLost = false,
@@ -578,8 +577,7 @@ TabFarm:CreateToggle({
                      pcall(function() event:FireServer(mobHRP) end)
                   end
                   pcall(function()
-                     local args = {mobHRP}
-                     game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Attack", unpack(args))
+                     game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Attack", mobHRP)
                   end)
                end
             end
@@ -631,4 +629,5 @@ TabFarm:CreateToggle({
                for _, fruit in ipairs(workspace:GetDescendants()) do
                   if fruit:IsA("Model") and fruit:FindFirstChild("Handle") then
                      local myHRP = getHRP()
+                     if myHRP and (fruit.Handle.Position - myHRP.Position).Magnitude < 10 then
    
