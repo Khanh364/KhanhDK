@@ -1,6 +1,5 @@
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
--- Cấu hình Window theo phong cách God Hub
 local Window = Fluent:CreateWindow({
     Title = "God Hub | Auto Bounty",
     SubTitle = "by DK",
@@ -11,130 +10,82 @@ local Window = Fluent:CreateWindow({
     MinimizeKey = Enum.KeyCode.End 
 })
 
--- Biến quản lý trạng thái
-local Options = Fluent.Options
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local StartBounty = LocalPlayer.leaderstats["Bounty/Honor"].Value
+local StartTime = os.time()
+
 local skillAim, autoV4, fastAttack, walkSpeed = false, false, false, 16
-local waterWalk, autoHaki, fakeLag, autoBounty = false, false, false, false
+local autoHaki, fakeLag, autoBounty = false, false, false
 
--- Thêm hình nền nhân vật (Anime Image)
-local CharacterImage = Instance.new("ImageLabel")
-CharacterImage.Parent = game:GetService("CoreGui"):FindFirstChild("Fluent") or game:GetService("CoreGui"):FindFirstChild("ScreenGui")
-CharacterImage.BackgroundTransparency = 1
-CharacterImage.Position = UDim2.new(0.65, 0, 0.2, 0)
-CharacterImage.Size = UDim2.new(0, 200, 0, 300)
-CharacterImage.Image = "rbxassetid://18210350325" -- ID ảnh anime (Bạn có thể thay bằng ID khác)
-CharacterImage.ZIndex = 100
-
--- Tabs
 local Tabs = {
     Bounty = Window:AddTab({ Title = "Auto Bounty", Icon = "target" }),
     PVP = Window:AddTab({ Title = "PVP Combat", Icon = "crosshair" }),
     Misc = Window:AddTab({ Title = "Movement", Icon = "zap" })
 }
 
--- Giao diện giống ảnh bạn gửi (Stats Board)
-Tabs.Bounty:AddParagraph({
+local StatsParagraph = Tabs.Bounty:AddParagraph({
     Title = "Bounty Statistics",
-    Content = "Current Bounty: 2,511,103\nBounty Earned: 0$\nTotal Bounty Earned: 0$\nTime Elapsed: 0h:0m:46s"
+    Content = "Updating..."
 })
+
+task.spawn(function()
+    while task.wait(1) do
+        local CurrentBounty = LocalPlayer.leaderstats["Bounty/Honor"].Value
+        local Earned = CurrentBounty - StartBounty
+        local Elapsed = os.time() - StartTime
+        
+        local h = math.floor(Elapsed / 3600)
+        local m = math.floor((Elapsed % 3600) / 60)
+        local s = Elapsed % 60
+        local TimeStr = string.format("%dh:%dm:%ds", h, m, s)
+        
+        StatsParagraph:SetTitle("Bounty Statistics")
+        StatsParagraph:SetDesc(
+            "Current Bounty: " .. tostring(CurrentBounty) .. "\n" ..
+            "Bounty Earned: " .. tostring(Earned) .. "$\n" ..
+            "Total Bounty Earned: " .. tostring(Earned) .. "$\n" ..
+            "Client Time Elapsed: " .. TimeStr .. "\n" ..
+            "Account Time Elapsed: " .. TimeStr
+        )
+    end
+end)
 
 Tabs.Bounty:AddButton({
     Title = "Next Player",
-    Description = "Skip current target",
-    Callback = function() print("Finding next player...") end
+    Callback = function() end
 })
 
 Tabs.Bounty:AddButton({
     Title = "Hop Server",
-    Description = "Find a new server",
     Callback = function() 
-        local ts = game:GetService("TeleportService")
-        ts:Teleport(game.PlaceId, game:GetService("Players").LocalPlayer)
+        game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
     end
 })
 
--- Tích hợp các tính năng bạn đã yêu cầu
-Tabs.PVP:AddToggle("AutoBounty", {Title = "Auto Farm Bounty", Default = false}):OnChanged(function(V) autoBounty = V end)
-Tabs.PVP:AddToggle("SkillAim", {Title = "Aim Skill (Auto Hit)", Default = false}):OnChanged(function(V) skillAim = V end)
-Tabs.PVP:AddToggle("FastAttack", {Title = "Fast Attack Aura", Default = false}):OnChanged(function(V) fastAttack = V end)
-Tabs.PVP:AddToggle("AutoV4", {Title = "Auto Activate V4", Default = false}):OnChanged(function(V) autoV4 = V end)
-Tabs.PVP:AddToggle("AutoHaki", {Title = "Auto Haki (Buso/Ken)", Default = false}):OnChanged(function(V) autoHaki = V end)
-
-Tabs.Misc:AddSlider("WS", {Title = "Walk Speed", Min = 16, Max = 300, Default = 16, Rounding = 0}):OnChanged(function(V) walkSpeed = V end)
-Tabs.Misc:AddToggle("WaterWalk", {Title = "Walk on Water", Default = false}):OnChanged(function(V) waterWalk = V end)
-Tabs.Misc:AddToggle("FakeLag", {Title = "Fake Lag", Default = false}):OnChanged(function(V) fakeLag = V end)
-
--- Icon bật/tắt Menu
 local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
 local ToggleButton = Instance.new("ImageButton", ScreenGui)
-ToggleButton.Size = UDim2.new(0, 50, 0, 50)
-ToggleButton.Position = UDim2.new(0.05, 0, 0.2, 0)
-ToggleButton.Image = "rbxassetid://15125530105"
+
+ToggleButton.Size = UDim2.new(0, 60, 0, 60)
+ToggleButton.Position = UDim2.new(0.05, 0, 0.15, 0)
+ToggleButton.Image = "rbxassetid://138096365922096" 
+ToggleButton.BackgroundTransparency = 1 
 ToggleButton.Draggable = true
-ToggleButton.BackgroundColor3 = Color3.fromRGB(30,30,30)
-Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 12)
+ToggleButton.Active = true
 
 local MenuVisible = true
 ToggleButton.MouseButton1Click:Connect(function()
     MenuVisible = not MenuVisible
     local gui = game:GetService("CoreGui"):FindFirstChild("Fluent") or game:GetService("CoreGui"):FindFirstChild("ScreenGui")
     if gui then gui.Enabled = MenuVisible end
-    CharacterImage.Visible = MenuVisible
 end)
 
--- LOGIC HỆ THỐNG (Giữ nguyên các tính năng PVP Hardcore của bạn)
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+Tabs.PVP:AddToggle("AutoBounty", {Title = "Auto Farm Bounty", Default = false}):OnChanged(function(V) autoBounty = V end)
+Tabs.PVP:AddToggle("SkillAim", {Title = "Aim Skill (Auto Hit)", Default = false}):OnChanged(function(V) skillAim = V end)
+Tabs.PVP:AddToggle("FastAttack", {Title = "Fast Attack Aura", Default = false}):OnChanged(function(V) fastAttack = V end)
+Tabs.PVP:AddToggle("AutoV4", {Title = "Auto Activate V4", Default = false}):OnChanged(function(V) autoV4 = V end)
 
--- Aim Skill Hook
-local Mouse = LocalPlayer:GetMouse()
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, index)
-    if skillAim and self == Mouse and (index == "Hit" or index == "Target") then
-        local target = nil
-        local dist = 250
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local magnitude = (p.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                if magnitude < dist then dist = magnitude target = p end
-            end
-        end
-        if target then return index == "Hit" and target.Character.HumanoidRootPart.CFrame or target.Character.HumanoidRootPart end
-    end
-    return oldIndex(self, index)
-end)
-
--- Anti-Kick
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    if getnamecallmethod() == "Kick" then return nil end
-    return oldNamecall(self, ...)
-end)
-
--- Các vòng lặp thực thi
-task.spawn(function()
-    while task.wait(0.1) do
-        pcall(function()
-            if autoHaki then
-                if not LocalPlayer.Character:FindFirstChild("HasBuso") then
-                    ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso")
-                end
-                game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            end
-            if autoV4 then ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateTransformation") end
-            if autoBounty or fastAttack then
-                -- Logic tìm và áp sát mục tiêu có thể thêm vào đây
-            end
-        end)
-    end
-end)
-
-game:GetService("RunService").Stepped:Connect(function()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = walkSpeed
-        settings().Network.IncomingReplicationLag = fakeLag and 1000 or 0
-    end
-end)
+Tabs.Misc:AddSlider("WS", {Title = "Walk Speed", Min = 16, Max = 300, Default = 16, Rounding = 0}):OnChanged(function(V) walkSpeed = V end)
+Tabs.Misc:AddToggle("FakeLag", {Title = "Fake Lag", Default = false}):OnChanged(function(V) fakeLag = V end)
 
 Window:SelectTab(1)
