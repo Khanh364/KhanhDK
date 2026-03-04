@@ -7,8 +7,34 @@ local Window = Fluent:CreateWindow({
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
     Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.RightControl
+    MinimizeKey = Enum.KeyCode.K 
 })
+
+-- Tạo Icon nổi để bật/tắt Menu (Dành cho Mobile và PC)
+local ScreenGui = Instance.new("ScreenGui")
+local ToggleButton = Instance.new("ImageButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Name = "KhanhHubToggle"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = ScreenGui
+ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ToggleButton.BorderSizePixel = 0
+ToggleButton.Position = UDim2.new(0.1, 0, 0.15, 0)
+ToggleButton.Size = UDim2.new(0, 50, 0, 50)
+ToggleButton.Image = "rbxassetid://15125530105" -- Icon hình khiên
+ToggleButton.Draggable = true -- Có thể kéo di chuyển vị trí nút
+
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = ToggleButton
+
+-- Logic khi bấm vào Icon
+ToggleButton.MouseButton1Click:Connect(function()
+    game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.K, false, game)
+end)
 
 local Tabs = {
     Main = Window:AddTab({ Title = "PVP Combat", Icon = "crosshair" }),
