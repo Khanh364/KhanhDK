@@ -2,7 +2,7 @@ local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "Khánh Hub Ultimate 🍉",
+    Title = "KhanhUltimate",
     SubTitle = "2026",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
@@ -34,35 +34,36 @@ setreadonly(mt, true)
 Tabs.Main:AddToggle("FA", {Title = "Fast Attack", Default = false, Callback = function(v) getgenv().Config.FastAttack = v end})
 Tabs.Farm:AddToggle("AF", {Title = "Auto Farm", Default = false, Callback = function(v) getgenv().Config.AutoFarm = v end})
 
+-- Nút toggle Pro (vuông, xanh lá, toggle mượt)
 local ScreenGui = Instance.new("ScreenGui")
-local TextButton = Instance.new("TextButton")
-local UICorner = Instance.new("UICorner")
-
-ScreenGui.Name = "SkibidiToggle"
-ScreenGui.Parent = (game:GetService("CoreGui"):FindFirstChild("RobloxGui") or game:GetService("CoreGui"))
+ScreenGui.Name = "ProToggle"
+ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 9999
 
+local TextButton = Instance.new("TextButton")
 TextButton.Parent = ScreenGui
 TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-TextButton.BackgroundTransparency = 0.4
-TextButton.Position = UDim2.new(0, 20, 0.4, 0)
-TextButton.Size = UDim2.new(0, 80, 0, 35)
-TextButton.Text = "skibidi"
-TextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-TextButton.TextSize = 16
-TextButton.Font = Enum.Font.GothamBold
+TextButton.BackgroundTransparency = 0.3
+TextButton.Position = UDim2.new(0, 10, 0.5, 0)
+TextButton.Size = UDim2.new(0, 60, 0, 60)
+TextButton.Text = "Pro"
+TextButton.TextColor3 = Color3.fromRGB(0, 255, 0)
+TextButton.TextSize = 20
+TextButton.Font = Enum.Font.SourceSansBold
 TextButton.Active = true
 TextButton.Draggable = true
+TextButton.TextWrapped = true
 
-UICorner.CornerRadius = UDim.new(0, 10)
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
 UICorner.Parent = TextButton
 
--- Fix triệt để: Gọi hàm Close/Open của chính Window Fluent
 TextButton.MouseButton1Click:Connect(function()
-    if Window then
-        Window:Minimize()
-    end
+    local vim = game:GetService("VirtualInputManager")
+    vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+    task.wait(0.03)
+    vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
 end)
 
 Window:SelectTab(1)
