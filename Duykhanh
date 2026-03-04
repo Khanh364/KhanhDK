@@ -2,7 +2,7 @@ local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "KhanhUltimate",          -- Đã bỏ dưa hấu
+    Title = "KhanhUltimate",
     SubTitle = "2026",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
@@ -34,9 +34,9 @@ setreadonly(mt, true)
 Tabs.Main:AddToggle("FA", {Title = "Fast Attack", Default = false, Callback = function(v) getgenv().Config.FastAttack = v end})
 Tabs.Farm:AddToggle("AF", {Title = "Auto Farm", Default = false, Callback = function(v) getgenv().Config.AutoFarm = v end})
 
--- Nút toggle Skibidi (vuông, toggle mượt)
+-- Nút toggle Pro (vuông, text "Pro", nhìn pro hơn)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SkibidiToggle"
+ScreenGui.Name = "ProToggle"
 ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 9999
@@ -47,16 +47,16 @@ TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 TextButton.BackgroundTransparency = 0.3
 TextButton.Position = UDim2.new(0, 10, 0.5, 0)
 TextButton.Size = UDim2.new(0, 60, 0, 60)  -- Vuông
-TextButton.Text = "skibidi"
-TextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-TextButton.TextSize = 14
+TextButton.Text = "Pro"  -- Đổi thành Pro đây!
+TextButton.TextColor3 = Color3.fromRGB(0, 255, 0)  -- Màu xanh lá pro vibe (có thể đổi lại trắng nếu thích)
+TextButton.TextSize = 20  -- To hơn cho chữ nổi bật
 TextButton.Font = Enum.Font.SourceSansBold
 TextButton.Active = true
 TextButton.Draggable = true
 TextButton.TextWrapped = true
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)  -- Bo nhẹ, hoặc đổi thành 0 nếu muốn vuông cứng
+UICorner.CornerRadius = UDim.new(0, 12)  -- Bo nhẹ cho đẹp
 UICorner.Parent = TextButton
 
 TextButton.MouseButton1Click:Connect(function()
