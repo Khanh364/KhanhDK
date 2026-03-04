@@ -1,83 +1,88 @@
 local RedzLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/RHEZAKUN/RedzLib/main/Source.lua"))()
 
 local Window = RedzLib:MakeWindow({
-    Title = "Khanh Hub - V3 (Logic Optimized)",
-    SubTitle = "Fixed for Mobile 2026",
-    HeaderColor = Color3.fromRGB(255, 50, 50)
+    Title = "Khanh Hub - DuyKhanh Edition",
+    SubTitle = "Mobile 2026 Pro",
+    HeaderColor = Color3.fromRGB(255, 0, 0)
 })
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
--- Variables
-local silentAimEnabled = false
-local killAuraEnabled = false
-local fastAttackEnabled = false
-local walkSpeed = 16
-local jumpPower = 50
+local cfg = {
+    speed = 16,
+    jump = 50,
+    aura = false,
+    fast = false,
+    infj = false,
+    noclip = false,
+    noSlow = false,
+    antiStun = false
+}
 
--- Hàm tìm đối thủ gần nhất (Fix lỗi nhận diện)
-local function getClosestPlayer()
+local function getClosest()
     local target = nil
-    local dist = 30 -- Tầm đánh 30 studs
+    local dist = 35
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid").Health > 0 then
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
             local d = (p.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-            if d < dist then
-                dist = d
-                target = p.Character
-            end
+            if d < dist then dist = d target = p.Character end
         end
     end
     return target
 end
 
--- TAB 1: PVP LOGIC (Đã sửa lại hoàn toàn)
 local Tab1 = Window:CreateTab("Bounty Hunter", "target")
-
-Tab1:AddToggle("Silent Aim + Kill Aura", false, function(Value)
-    killAuraEnabled = Value
-    silentAimEnabled = Value
+Tab1:AddToggle("Silent Aim + Kill Aura", false, function(v) cfg.aura = v end)
+Tab1:AddToggle("Fast Attack", false, function(v) cfg.fast = v end)
+Tab1:AddButton("Teleport Behind Enemy", function()
+    local t = getClosest()
+    if t then LocalPlayer.Character.HumanoidRootPart.CFrame = t.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3) end
 end)
 
-Tab1:AddToggle("Fast Attack (Super Speed)", false, function(Value)
-    fastAttackEnabled = Value
-end)
+local Tab2 = Window:CreateTab("Combat Pro", "sword")
+Tab2:AddToggle("No Slowdown", false, function(v) cfg.noSlow = v end)
+Tab2:AddToggle("Anti-Stun", false, function(v) cfg.antiStun = v end)
 
--- TAB 2: MOVEMENT
-local Tab2 = Window:CreateTab("Movement", "zap")
-Tab2:AddSlider("Tốc độ", 16, 500, 16, function(V) walkSpeed = V end)
-Tab2:AddSlider("Nhảy cao", 50, 1000, 50, function(V) jumpPower = V end)
-Tab2:AddToggle("Nhảy vô hạn", false, function(V) _G.InfJ = V end)
+local Tab3 = Window:CreateTab("Movement", "zap")
+Tab3:AddSlider("WalkSpeed", 16, 500, 16, function(v) cfg.speed = v end)
+Tab3:AddSlider("JumpPower", 50, 1000, 50, function(v) cfg.jump = v end)
+Tab3:AddToggle("Infinite Jump", false, function(v) cfg.infj = v end)
+Tab3:AddToggle("Noclip", false, function(v) cfg.noclip = v end)
 
--- [VÒNG LẶP XỬ LÝ CHÍNH - ĐÃ KIỂM TRA]
-RunService.RenderStepped:Connect(function()
+RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     
-    -- Fix Speed & Jump (Ép chỉ số liên tục)
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then
-        hum.WalkSpeed = walkSpeed
-        hum.JumpPower = jumpPower
+        hum.WalkSpeed = cfg.speed
+        hum.JumpPower = cfg.jump
         hum.UseJumpPower = true
+        
+        if cfg.antiStun or cfg.noSlow then
+            hum.PlatformStand = false
+            if hum:GetState() == Enum.HumanoidStateType.Ragdoll then
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
+        end
     end
 
-    -- Fix Fast Attack & Kill Aura
-    if fastAttackEnabled or killAuraEnabled then
-        local target = getClosestPlayer()
+    if cfg.noclip then
+        for _, p in pairs(char:GetChildren()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+    end
+
+    if cfg.aura or cfg.fast then
+        local target = getClosest()
         local tool = char:FindFirstChildOfClass("Tool")
-        
         if target and tool then
-            -- 1. Kích hoạt đòn đánh client
             tool:Activate()
-            
-            -- 2. Ép sát thương lên Server (Quét Remote)
             for _, v in pairs(tool:GetDescendants()) do
                 if v:IsA("RemoteEvent") then
-                    -- Gửi dữ liệu tới vị trí địch
                     v:FireServer(target.HumanoidRootPart.Position)
                     v:FireServer(target)
                 end
@@ -86,11 +91,8 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Fix Nhảy vô hạn
-game:GetService("UserInputService").JumpRequest:Connect(function()
-    if _G.InfJ and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+UserInputService.JumpRequest:Connect(function()
+    if cfg.infj and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
-
-print("Khanh Hub V3: Logic Checked & Loaded")
