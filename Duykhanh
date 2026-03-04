@@ -3,67 +3,345 @@ local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/d
 
 local Window = Fluent:CreateWindow({
     Title = "KhanhUltimate",
-    SubTitle = "2026",
+    SubTitle = "2026 - Full Banana Style",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
-    Theme = "Light",
+    Theme = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl
 })
 
 local Tabs = {
     Main = Window:AddTab({ Title = "Main", Icon = "home" }),
-    Farm = Window:AddTab({ Title = "Farm", Icon = "swords" }),
+    Farm = Window:AddTab({ Title = "Farming", Icon = "swords" }),
+    Shop = Window:AddTab({ Title = "Misc Shop", Icon = "shopping-bag" }),
+    Teleport = Window:AddTab({ Title = "Teleport", Icon = "navigation" }),
     Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
 }
 
 local lp = game.Players.LocalPlayer
-getgenv().Config = {}
+local RS = game:GetService("ReplicatedStorage")
+local WS = game:GetService("Workspace")
+local VU = game:GetService("VirtualUser")
 
+getgenv().Config = {
+    FastAttack = false,
+    AutoFarmLevel = false,
+    AutoMastery = false,
+    AutoBoss = false,
+    AutoRaid = false,
+    AutoFruitSniper = false,
+    AutoSeaBeast = false,
+    AutoEliteHunter = false,
+    AutoMirage = false,
+    AutoHallow = false,
+    AutoDoughKing = false,
+    AutoLeviathan = false,
+    MasteryMove = "Z",
+    SniperMode = "All",
+    RaidType = "Flame",
+    BossName = "All",
+    SeaBeastMode = "Auto Kill",
+    EliteMode = "Auto Kill",
+    MirageMode = "Notify + Tele",
+    HallowMode = "Auto Kill",
+    DoughKingMode = "Auto Kill",
+    LeviathanMode = "Auto Kill"
+}
+
+-- Fast Attack Hook
 local mt = getrawmetatable(game)
 local oldNamecall = mt.__namecall
 setreadonly(mt, false)
 mt.__namecall = newcclosure(function(self, ...)
-    if getgenv().Config.FastAttack and getnamecallmethod() == "FireServer" and self.Name == "MeleeDamage" then
+    if Config.FastAttack and getnamecallmethod() == "FireServer" and self.Name == "MeleeDamage" then
         for i = 1, 5 do oldNamecall(self, ...) end
     end
     return oldNamecall(self, ...)
 end)
 setreadonly(mt, true)
 
-Tabs.Main:AddToggle("FA", {Title = "Fast Attack", Default = false, Callback = function(v) getgenv().Config.FastAttack = v end})
-Tabs.Farm:AddToggle("AF", {Title = "Auto Farm", Default = false, Callback = function(v) getgenv().Config.AutoFarm = v end})
+-- Utility Functions
+local function FireCommF(action, ...)
+    pcall(function() RS.Remotes.CommF_:InvokeServer(action, ...) end)
+end
 
--- Nút toggle Pro (vuông, text "Pro", nhìn pro hơn)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ProToggle"
-ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 9999
+local function TeleTo(cframe)
+    if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        lp.Character.HumanoidRootPart.CFrame = cframe
+    end
+end
 
-local TextButton = Instance.new("TextButton")
-TextButton.Parent = ScreenGui
-TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-TextButton.BackgroundTransparency = 0.3
-TextButton.Position = UDim2.new(0, 10, 0.5, 0)
-TextButton.Size = UDim2.new(0, 60, 0, 60)  -- Vuông
-TextButton.Text = "Pro"  -- Đổi thành Pro đây!
-TextButton.TextColor3 = Color3.fromRGB(0, 255, 0)  -- Màu xanh lá pro vibe (có thể đổi lại trắng nếu thích)
-TextButton.TextSize = 20  -- To hơn cho chữ nổi bật
-TextButton.Font = Enum.Font.SourceSansBold
-TextButton.Active = true
-TextButton.Draggable = true
-TextButton.TextWrapped = true
+-- Raid Positions (Third Sea)
+local RaidWait = CFrame.new(5284.8, 22.19, 6044.94)
+local RaidBosses = {
+    CFrame.new(5286.37, 61.8, 6061.95),
+    CFrame.new(5228.39, 60.8, 6103.51),
+    CFrame.new(5195.54, 60.8, 6043.51)
+}
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)  -- Bo nhẹ cho đẹp
-UICorner.Parent = TextButton
+-- Mirage Island Position
+local MiragePos = CFrame.new(-5000, 50, -5000)  -- Khu vực Mirage thường spawn
 
-TextButton.MouseButton1Click:Connect(function()
+-- Elite Hunter NPC (Third Sea)
+local ElitePos = CFrame.new(-5415, 314, -2823)  -- Elite Pirate spawn area
+
+-- Hallow Essence (Halloween Event - Haunted Castle)
+local HallowPos = CFrame.new(-9500, 50, -9500)  -- Haunted Castle approx
+
+-- Dough King / Leviathan (Third Sea)
+local DoughKingPos = CFrame.new( -2000, 100, -10000 )  -- Approx
+local LeviathanPos = CFrame.new( -6400, 100, -6000 )
+
+-- Fruit Sniper
+local Mythics = {"Dragon", "Leopard", "Kitsune", "Mammoth", "T-Rex"}
+local function FindFruit()
+    for _, v in pairs(WS:GetChildren()) do
+        if (v:IsA("Tool") or v.Name:find("Fruit")) and (Config.SniperMode == "All" or table.find(Mythics, v.Name)) then
+            return v
+        end
+    end
+    return nil
+end
+
+-- Fast Attack Toggle
+Tabs.Main:AddToggle("FA", {Title = "Fast Attack", Default = false, Callback = function(v) Config.FastAttack = v end})
+
+-- Auto Farm Level
+Tabs.Farm:AddToggle("AFL", {Title = "Auto Farm Level", Default = false, Callback = function(v)
+    Config.AutoFarmLevel = v
+    spawn(function()
+        while Config.AutoFarmLevel do
+            pcall(function()
+                FireCommF("StartQuest", "BanditQuest1", 1) -- adjust quest
+                local mob = WS.Enemies:FindFirstChildWhichIsA("Model")
+                if mob and mob:FindFirstChild("HumanoidRootPart") then
+                    TeleTo(mob.HumanoidRootPart.CFrame * CFrame.new(0,10,0))
+                    VU:ClickButton1(Vector2.new())
+                end
+            end)
+            task.wait(0.5)
+        end
+    end)
+end})
+
+-- Auto Mastery
+Tabs.Farm:AddToggle("AFM", {Title = "Auto Mastery Farm", Default = false, Callback = function(v)
+    Config.AutoMastery = v
+    spawn(function()
+        while Config.AutoMastery do
+            pcall(function()
+                local char = lp.Character
+                if char then
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    if tool then tool.Parent = char end
+                    local key = string.byte(Config.MasteryMove)
+                    keypress(key) task.wait(0.1) keyrelease(key)
+                    local enemy = WS.Enemies:FindFirstChildWhichIsA("Model")
+                    if enemy then TeleTo(enemy.HumanoidRootPart.CFrame * CFrame.new(0,5,0)) end
+                end
+            end)
+            task.wait(0.2)
+        end
+    end)
+end})
+Tabs.Farm:AddInput("MSkill", {Title = "Mastery Skill (Z/X/C/V)", Default = "Z", Callback = function(v) Config.MasteryMove = v end})
+
+-- Auto Boss (cơ bản)
+Tabs.Farm:AddToggle("AFB", {Title = "Auto Farm Boss", Default = false, Callback = function(v) Config.AutoBoss = v end})
+-- (có thể mở rộng boss list nếu cần)
+
+-- Auto Raid
+Tabs.Farm:AddToggle("AFR", {Title = "Auto Raid Farm", Default = false, Callback = function(v)
+    Config.AutoRaid = v
+    spawn(function()
+        while Config.AutoRaid do
+            pcall(function()
+                FireCommF("Raid", "BuyChip")
+                TeleTo(RaidWait)
+                task.wait(1)
+                FireCommF("Raid", "Select", Config.RaidType)
+                task.wait(2)
+                for i=1,3 do
+                    TeleTo(RaidBosses[i] or RaidWait)
+                    for j=1,20 do VU:ClickButton1(Vector2.new()) task.wait(0.1) end
+                    task.wait(3)
+                end
+                task.wait(10)
+            end)
+            task.wait(2)
+        end
+    end)
+end})
+Tabs.Farm:AddDropdown("RaidT", {Title = "Raid Type", Values = {"Flame","Sand","Snow","Magma","Light","Dark","Thunder","Ice"}, Default = "Flame", Callback = function(v) Config.RaidType = v end})
+
+-- Auto Fruit Sniper
+Tabs.Farm:AddToggle("AFS", {Title = "Auto Fruit Sniper", Default = false, Callback = function(v)
+    Config.AutoFruitSniper = v
+    spawn(function()
+        while Config.AutoFruitSniper do
+            pcall(function()
+                local f = FindFruit()
+                if f and f:FindFirstChild("Handle") then
+                    TeleTo(f.Handle.CFrame * CFrame.new(0,5,0))
+                    task.wait(0.5)
+                    Fluent:Notify({Title="SNIPED!", Content=f.Name})
+                end
+            end)
+            task.wait(0.5)
+        end
+    end)
+end})
+Tabs.Farm:AddDropdown("SniperM", {Title = "Sniper Mode", Values = {"All","Mythic Only"}, Default = "All", Callback = function(v) Config.SniperMode = v end})
+
+-- Auto Sea Beast
+Tabs.Farm:AddToggle("ASB", {Title = "Auto Sea Beast Farm", Default = false, Callback = function(v)
+    Config.AutoSeaBeast = v
+    spawn(function()
+        while Config.AutoSeaBeast do
+            pcall(function()
+                local sb = WS:FindFirstChild("SeaBeasts") and WS.SeaBeasts:FindFirstChild("SeaBeast")
+                if sb and sb:FindFirstChild("HumanoidRootPart") then
+                    if Config.SeaBeastMode == "Auto Kill" then
+                        TeleTo(sb.HumanoidRootPart.CFrame * CFrame.new(math.random(-50,50),20,math.random(-50,50)))
+                        for i=1,30 do VU:ClickButton1(Vector2.new()) task.wait(0.1) end
+                    else
+                        Fluent:Notify({Title="SEA BEAST!", Content="Pos: "..tostring(sb.HumanoidRootPart.Position)})
+                    end
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+end})
+Tabs.Farm:AddDropdown("SBMode", {Title = "Sea Beast Mode", Values = {"Notify Only","Auto Kill"}, Default = "Auto Kill", Callback = function(v) Config.SeaBeastMode = v end})
+
+-- Auto Mirage Island
+Tabs.Farm:AddToggle("AMI", {Title = "Auto Mirage Island Farm", Default = false, Callback = function(v)
+    Config.AutoMirage = v
+    spawn(function()
+        while Config.AutoMirage do
+            pcall(function()
+                local mirage = WS:FindFirstChild("Mirage Island")
+                if mirage then
+                    TeleTo(MiragePos)
+                    Fluent:Notify({Title="MIRAGE FOUND!", Content="Tele to Mirage Island!"})
+                    task.wait(5)  -- Stay for collect gear/puzzle
+                end
+            end)
+            task.wait(3)
+        end
+    end)
+end})
+
+-- Auto Elite Hunter
+Tabs.Farm:AddToggle("AEH", {Title = "Auto Elite Hunter Farm", Default = false, Callback = function(v)
+    Config.AutoEliteHunter = v
+    spawn(function()
+        while Config.AutoEliteHunter do
+            pcall(function()
+                local elite = WS.Enemies:FindFirstChild("Elite Pirate")
+                if elite and elite:FindFirstChild("HumanoidRootPart") then
+                    TeleTo(elite.HumanoidRootPart.CFrame * CFrame.new(0,10,0))
+                    for i=1,20 do VU:ClickButton1(Vector2.new()) task.wait(0.1) end
+                else
+                    TeleTo(ElitePos)
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+end})
+
+-- Auto Hallow Essence
+Tabs.Farm:AddToggle("AHE", {Title = "Auto Hallow Essence Farm", Default = false, Callback = function(v)
+    Config.AutoHallow = v
+    spawn(function()
+        while Config.AutoHallow do
+            pcall(function()
+                local ghost = WS.Enemies:FindFirstChildWhichIsA("Model") -- Ghost during Halloween
+                if ghost and ghost:FindFirstChild("HumanoidRootPart") then
+                    TeleTo(ghost.HumanoidRootPart.CFrame * CFrame.new(0,10,0))
+                    for i=1,15 do VU:ClickButton1(Vector2.new()) task.wait(0.1) end
+                else
+                    TeleTo(HallowPos)
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+end})
+
+-- Auto Dough King
+Tabs.Farm:AddToggle("ADK", {Title = "Auto Dough King Farm", Default = false, Callback = function(v)
+    Config.AutoDoughKing = v
+    spawn(function()
+        while Config.AutoDoughKing do
+            pcall(function()
+                local dk = WS.Enemies:FindFirstChild("Dough King")
+                if dk and dk:FindFirstChild("HumanoidRootPart") then
+                    TeleTo(dk.HumanoidRootPart.CFrame * CFrame.new(0,10,0))
+                    for i=1,30 do VU:ClickButton1(Vector2.new()) task.wait(0.1) end
+                else
+                    TeleTo(DoughKingPos)
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+end})
+
+-- Auto Leviathan
+Tabs.Farm:AddToggle("ALV", {Title = "Auto Leviathan Farm", Default = false, Callback = function(v)
+    Config.AutoLeviathan = v
+    spawn(function()
+        while Config.AutoLeviathan do
+            pcall(function()
+                local lv = WS:FindFirstChild("Leviathan")
+                if lv and lv:FindFirstChild("HumanoidRootPart") then
+                    TeleTo(lv.HumanoidRootPart.CFrame * CFrame.new(math.random(-50,50),20,math.random(-50,50)))
+                    for i=1,30 do VU:ClickButton1(Vector2.new()) task.wait(0.1) end
+                else
+                    TeleTo(LeviathanPos)
+                end
+            end)
+            task.wait(2)
+        end
+    end)
+end})
+
+-- Misc Shop & Teleport (giữ nguyên từ trước)
+Tabs.Shop:AddInput("Code", {Title = "Redeem Code", Placeholder = "Code...", Callback = function(v) FireCommF("PromotionCodeRedeem", v) end})
+Tabs.Shop:AddButton({Title = "Teleport Third Sea", Callback = function() FireCommF("TravelZou") end})
+-- Thêm các button khác nếu cần
+
+-- Nút toggle Pro
+local sg = Instance.new("ScreenGui", game.CoreGui)
+sg.Name = "ProToggle"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 9999
+
+local btn = Instance.new("TextButton", sg)
+btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+btn.BackgroundTransparency = 0.3
+btn.Position = UDim2.new(0,10,0.5,0)
+btn.Size = UDim2.new(0,60,0,60)
+btn.Text = "Pro"
+btn.TextColor3 = Color3.fromRGB(0,255,0)
+btn.TextSize = 20
+btn.Font = Enum.Font.SourceSansBold
+btn.Draggable = true
+btn.TextWrapped = true
+
+local corner = Instance.new("UICorner", btn)
+corner.CornerRadius = UDim.new(0,12)
+
+btn.MouseButton1Click:Connect(function()
     local vim = game:GetService("VirtualInputManager")
     vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
     task.wait(0.03)
     vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
 end)
 
-Window:SelectTab(1)
+Window:SelectTab(2)
+SaveManager:SetLibrary(Fluent)
