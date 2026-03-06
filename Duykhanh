@@ -6,7 +6,7 @@ local player = Players.LocalPlayer
 local CombatFramework = require(player.PlayerScripts:WaitForChild("CombatFramework"))
 local RigLib = require(ReplicatedStorage.CombatFramework.RigLib)
 
-local baseSpeed = 0.08
+local baseSpeed = 0.01
 local maxRange = 80
 local maxSpam = 8
 
