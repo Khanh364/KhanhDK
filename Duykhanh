@@ -1,116 +1,167 @@
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+getgenv().SuperAttack = true
+getgenv().SuperFast = true
+getgenv().BountyOnly = true
+getgenv().Range = 120
+getgenv().NoAnim = false
+getgenv().AutoEquip = true
+getgenv().FruitSpam = true
+getgenv().AutoAim = false
 
-local Window = Fluent:CreateWindow({
-    Title = "KhanhUltimate",
-    SubTitle = "2026",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = true,
-    Theme = "Light",
-    MinimizeKey = Enum.KeyCode.RightControl
-})
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local plr = Players.LocalPlayer
 
-local Tabs = {
-    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
-    Farm = Window:AddTab({ Title = "Farm", Icon = "swords" }),
-    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
-}
+repeat task.wait() until plr.PlayerScripts:FindFirstChild("CombatFramework")
+local CombatFramework = require(plr.PlayerScripts.CombatFramework)
+local CbFw = debug.getupvalues(CombatFramework)
+local CbFw2 = CbFw[2]
+local RigLib = require(ReplicatedStorage.CombatFramework.RigLib)
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ProToggle"
-ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 9999
+VirtualUser:CaptureController()
+VirtualUser:ClickButton1(Vector2.new())
 
-local Frame = Instance.new("Frame")
-Frame.Parent = ScreenGui
-Frame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-Frame.BackgroundTransparency = 0.45
-Frame.Position = UDim2.new(0, 15, 0.5, -15)
-Frame.Size = UDim2.new(0, 32, 0, 32)
-Frame.Active = true
-Frame.Draggable = true
+local fruitSkills = {"Z", "X", "C", "V"}
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 6)
-UICorner.Parent = Frame
+function IsFruitEquipped()
+    local tool = plr.Character and plr.Character:FindFirstChildOfClass("Tool")
+    return tool and (tool:FindFirstChild("Fruit") or string.find(tool.Name:lower(), "fruit"))
+end
 
-local TextLabel = Instance.new("TextLabel")
-TextLabel.Parent = Frame
-TextLabel.Size = UDim2.new(1, 0, 1, 0)
-TextLabel.BackgroundTransparency = 1
-TextLabel.Text = "Pro"
-TextLabel.TextColor3 = Color3.fromRGB(0, 255, 180)
-TextLabel.TextSize = 12
-TextLabel.Font = Enum.Font.GothamBlack
-TextLabel.TextStrokeTransparency = 0.8
-TextLabel.TextStrokeColor3 = Color3.fromRGB(0, 255, 180)
+function GetCurrentBlade()
+    local p13 = CbFw2.activeController
+    local ret = p13.blades and p13.blades[1]
+    if not ret then return nil end
+    while ret.Parent \~= plr.Character do
+        ret = ret.Parent
+    end
+    return ret
+end
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(0, 255, 180)
-UIStroke.Thickness = 1.5
-UIStroke.Transparency = 0.3
-UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-UIStroke.Parent = Frame
-
-local UIGradient = Instance.new("UIGradient")
-UIGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 200)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120, 255, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 200))
-}
-UIGradient.Rotation = 45
-UIGradient.Parent = Frame
-
-local TweenService = game:GetService("TweenService")
-local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
-Frame.MouseEnter:Connect(function()
-    TweenService:Create(Frame, tweenInfo, {Size = UDim2.new(0, 38, 0, 38)}):Play()
-    TweenService:Create(UIStroke, tweenInfo, {Thickness = 3, Transparency = 0}):Play()
-end)
-
-Frame.MouseLeave:Connect(function()
-    TweenService:Create(Frame, tweenInfo, {Size = UDim2.new(0, 32, 0, 32)}):Play()
-    TweenService:Create(UIStroke, tweenInfo, {Thickness = 1.5, Transparency = 0.3}):Play()
-end)
-
-Frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        TweenService:Create(Frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 28, 0, 28)}):Play()
+function SuperAttack()
+    print("[DEBUG] Vào SuperAttack")
+    
+    local AC = CbFw2.activeController
+    if not AC then
+        warn("[DEBUG] activeController = nil")
+        VirtualUser:ClickButton1(Vector2.new())
+        return
+    end
+    print("[DEBUG] activeController OK")
+    
+    if not AC.blades or not AC.blades[1] then
+        warn("[DEBUG] Không có blades")
+        return
+    end
+    print("[DEBUG] Blades OK")
+    
+    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        warn("[DEBUG] Không có HumanoidRootPart")
+        return
+    end
+    
+    local bladehit = RigLib.getBladeHits(plr.Character, {hrp}, getgenv().Range)
+    print("[DEBUG] Bladehits:", #bladehit)
+    
+    local targets = {}
+    local hash = {}
+    
+    for _, v in pairs(bladehit) do
+        local model = v.Parent
+        if model:FindFirstChild("HumanoidRootPart") and model \~= plr.Character and not hash[model] then
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            local isPlayer = Players:GetPlayerFromCharacter(model)
+            if hum and hum.Health > 0 and (not getgenv().BountyOnly or isPlayer) then
+                table.insert(targets, model.HumanoidRootPart)
+                hash[model] = true
+            end
+        end
+    end
+    
+    print("[DEBUG] Targets hợp lệ:", #targets)
+    
+    if #targets > 0 then
+        print("[DEBUG] Bắt đầu spoof - Targets:", #targets)
         
-        local Sound = Instance.new("Sound")
-        Sound.SoundId = "rbxassetid://9119707214"
-        Sound.Volume = 0.4
-        Sound.Parent = Frame
-        Sound:Play()
-        game:GetService("Debris"):AddItem(Sound, 1)
+        local u8 = debug.getupvalue(AC.attack, 5)
+        local u9 = debug.getupvalue(AC.attack, 6)
+        local u7 = debug.getupvalue(AC.attack, 4)
+        local u10 = debug.getupvalue(AC.attack, 7)
+        
+        if not (u8 and u9 and u7 and u10) then
+            warn("[DEBUG] Upvalue nil")
+            return
+        end
+        
+        local u12 = (u8 * 798405 + u7 * 727595) % u9
+        local u13 = u7 * 798405
+        (function()
+            u12 = (u12 * u9 + u13) % 1099511627776
+            u8 = math.floor(u12 / u9)
+            u7 = u12 - u8 * u9
+        end)()
+        u10 = u10 + 1
+        
+        debug.setupvalue(AC.attack, 5, u8)
+        debug.setupvalue(AC.attack, 6, u9)
+        debug.setupvalue(AC.attack, 4, u7)
+        debug.setupvalue(AC.attack, 7, u10)
+        
+        if not getgenv().NoAnim then
+            pcall(function()
+                for _, anim in pairs(AC.animator.anims.basic) do
+                    anim:Play()
+                end
+            end)
+        end
+        
+        local blade = GetCurrentBlade()
+        if blade and plr.Character:FindFirstChildOfClass("Tool") then
+            print("[DEBUG] Gửi hit - Blade:", blade.Name)
+            ReplicatedStorage.RigControllerEvent:FireServer("weaponChange", tostring(blade))
+            ReplicatedStorage.Remotes.Validator:FireServer(math.floor(u12 / 1099511627776 * 16777215), u10)
+            ReplicatedStorage.RigControllerEvent:FireServer("hit", targets, 1, "")
+            print("[DEBUG] Hit đã gửi cho", #targets, "mục tiêu")
+        else
+            warn("[DEBUG] Không gửi hit - Blade:", blade, "Tool:", plr.Character:FindFirstChildOfClass("Tool"))
+        end
+    else
+        print("[DEBUG] Không có target trong range")
+    end
+    
+    if getgenv().FruitSpam and IsFruitEquipped() then
+        print("[DEBUG] Spam skill fruit")
+        for _, sk in ipairs(fruitSkills) do
+            local key = Enum.KeyCode[sk]
+            VirtualInputManager:SendKeyEvent(true, key, false, game)
+            task.wait(0.001)
+            VirtualInputManager:SendKeyEvent(false, key, false, game)
+        end
+    end
+end
 
-        local vim = game:GetService("VirtualInputManager")
-        vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
-        task.wait(0.01)
-        vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
+spawn(function()
+    while getgenv().SuperAttack and getgenv().AutoEquip do
+        if plr.Character and not plr.Character:FindFirstChildOfClass("Tool") then
+            local tool = plr.Backpack:FindFirstChildOfClass("Tool")
+            if tool then
+                print("[DEBUG] Auto equip:", tool.Name)
+                plr.Character.Humanoid:EquipTool(tool)
+            else
+                print("[DEBUG] Không tìm thấy tool trong backpack")
+            end
+        end
+        task.wait(0.5)
     end
 end)
 
-Frame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        TweenService:Create(Frame, TweenInfo.new(0.2, Enum.EasingStyle.Back), {Size = UDim2.new(0, 38, 0, 38)}):Play()
+spawn(function()
+    print("[DEBUG] Vòng lặp SuperAttack bắt đầu")
+    while getgenv().SuperAttack do
+        pcall(SuperAttack)
+        task.wait(getgenv().SuperFast and 0 or 0.03)
     end
+    print("[DEBUG] Vòng lặp SuperAttack dừng")
 end)
-
-task.spawn(function()
-    while true do
-        UIGradient.Offset = Vector2.new(-1.2, 0)
-        local t = TweenService:Create(UIGradient, TweenInfo.new(3, Enum.EasingStyle.Linear), {Offset = Vector2.new(1.2, 0)})
-        t:Play()
-        t.Completed:Wait()
-    end
-end)
-
-Window:OnMinimize(function()
-    Frame.Visible = not Frame.Visible
-end)
-
-Window:SelectTab(1)
