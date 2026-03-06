@@ -1,49 +1,108 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local TeleportService = game:GetService("TeleportService")
 
 local player = Players.LocalPlayer
 local CombatFramework = require(player.PlayerScripts:WaitForChild("CombatFramework"))
 local RigLib = require(ReplicatedStorage.CombatFramework.RigLib)
 
-local baseSpeed = 0.01
-local maxRange = 80
-local maxSpam = 8
+local baseSpeed = 0.1
+local maxRange = 60
+local maxSpam = 6
+local killCount = 0
+local lastKillTime = 0
+local stunChecks = 0
 
-local function getClosest()
+local function getServerPop()
+    return #Players:GetPlayers()
+end
+
+local function getSmartTarget()
     local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
     
-    local closest, minDist = nil, maxRange
+    local targets = {}
     for _, p in pairs(Players:GetPlayers()) do
         if p \~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character.Humanoid.Health > 0 then
             local dist = (root.Position - p.Character.HumanoidRootPart.Position).Magnitude
-            if dist < minDist then minDist = dist; closest = p end
+            if dist <= maxRange then
+                local bounty = p.leaderstats and p.leaderstats:FindFirstChild("Bounty") and p.leaderstats.Bounty.Value or 0
+                local hp = p.Character.Humanoid.Health / p.Character.Humanoid.MaxHealth
+                if bounty < 20000000 and hp < 0.8 then
+                    table.insert(targets, {player = p, dist = dist})
+                end
+            end
         end
     end
-    return closest
+    
+    if #targets == 0 then return nil end
+    table.sort(targets, function(a,b) return a.dist < b.dist end)
+    return targets[1].player
+end
+
+local function checkStunned()
+    local humanoid = player.Character and player.Character:FindFirstChild("Humanoid")
+    if not humanoid then return false end
+    return humanoid.PlatformStand or humanoid.WalkSpeed <= 5 or humanoid:GetState() == Enum.HumanoidStateType.PlatformStanding
+end
+
+local function breakStun()
+    stunChecks = stunChecks + 1
+    for i = 1, 4 do
+        VirtualUser:Button2Down(Vector2.new())
+        task.wait(0.06)
+        VirtualUser:Button2Up(Vector2.new())
+    end
+    for i = 1, 6 do
+        VirtualUser:Button1Down(Vector2.new())
+        task.wait(0.04)
+        VirtualUser:Button1Up(Vector2.new())
+    end
+end
+
+local function shouldIdle()
+    if getServerPop() > 14 then return true end
+    if tick() - lastKillTime < 15 and killCount >= 4 then return true end
+    if math.random(1,5) == 1 then return true end
+    return false
 end
 
 task.spawn(function()
     while true do
-        local randDelay = baseSpeed + math.random(2,12)/100
+        if shouldIdle() then
+            task.wait(math.random(5,15)/10)
+            continue
+        end
+        
+        local randDelay = baseSpeed + math.random(5,20)/100
         task.wait(randDelay)
         
         local ac = CombatFramework.activeController
         if not ac or not ac.active or not player.Character then continue end
         
-        local target = getClosest()
+        if checkStunned() then
+            breakStun()
+            if stunChecks > 10 then
+                TeleportService:Teleport(game.PlaceId, player)
+            end
+            continue
+        end
+        
+        local target = getSmartTarget()
         if not target then continue end
         
         local root = player.Character.HumanoidRootPart
         local tRoot = target.Character.HumanoidRootPart
         
         local dist = (root.Position - tRoot.Position).Magnitude
-        if dist < 60 then
-            local randVel = 30 + math.random(0,20)
+        if dist < 50 then
+            local randVel = 20 + math.random(0,20)
+            local jitter = Vector3.new(math.random(-2,2), 0, math.random(-2,2))
             local bv = root:FindFirstChild("BodyVelocity") or Instance.new("BodyVelocity", root)
-            bv.MaxForce = Vector3.new(4e5, 0, 4e5)
-            bv.Velocity = (tRoot.Position - root.Position).Unit * randVel
+            bv.MaxForce = Vector3.new(3e5, 0, 3e5)
+            bv.Velocity = ((tRoot.Position + jitter) - root.Position).Unit * randVel
         end
         
         local hits = RigLib.getBladeHits(root, {tRoot}, maxRange)
@@ -58,15 +117,31 @@ task.spawn(function()
             debug.setupvalue(ac.attack, 7, u10 + 1)
         end
         
-        local randSpam = 6 + math.random(0,2)
+        local randSpam = 4 + math.random(0,2)
         for i = 1, randSpam do
-            pcall(ac.attack)
+            if math.random(1,10) \~= 1 then
+                pcall(ac.attack)
+            end
         end
         
         if ac.animator and ac.animator.anims.basic[1] then
             ac.animator.anims.basic[1]:Play()
         end
+        
+        if target.Character.Humanoid.Health <= 0 then
+            killCount = killCount + 1
+            lastKillTime = tick()
+        end
     end
 end)
 
-print("ANTI-SUS FA MẠNH NHẤT LOADED")
+task.spawn(function()
+    while true do
+        task.wait(60)
+        if killCount >= 8 or stunChecks > 20 then
+            TeleportService:Teleport(game.PlaceId, player)
+        end
+        killCount = 0
+        stunChecks = 0
+    end
+end)
