@@ -1,167 +1,39 @@
-getgenv().SuperAttack = true
-getgenv().SuperFast = true
-getgenv().BountyOnly = true
-getgenv().Range = 120
-getgenv().NoAnim = false
-getgenv().AutoEquip = true
-getgenv().FruitSpam = true
-getgenv().AutoAim = false
+local plr = game.Players.LocalPlayer
+local rs = game:GetService("ReplicatedStorage")
+local remote = rs:FindFirstChild("MainEvent") or rs:FindFirstChild("RemoteEvent")
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local plr = Players.LocalPlayer
+local config = {
+    fastSpeed = 0.03,
+    auraRadius = 30,
+    auraDamage = 999,
+}
 
-repeat task.wait() until plr.PlayerScripts:FindFirstChild("CombatFramework")
-local CombatFramework = require(plr.PlayerScripts.CombatFramework)
-local CbFw = debug.getupvalues(CombatFramework)
-local CbFw2 = CbFw[2]
-local RigLib = require(ReplicatedStorage.CombatFramework.RigLib)
-
-VirtualUser:CaptureController()
-VirtualUser:ClickButton1(Vector2.new())
-
-local fruitSkills = {"Z", "X", "C", "V"}
-
-function IsFruitEquipped()
-    local tool = plr.Character and plr.Character:FindFirstChildOfClass("Tool")
-    return tool and (tool:FindFirstChild("Fruit") or string.find(tool.Name:lower(), "fruit"))
-end
-
-function GetCurrentBlade()
-    local p13 = CbFw2.activeController
-    local ret = p13.blades and p13.blades[1]
-    if not ret then return nil end
-    while ret.Parent \~= plr.Character do
-        ret = ret.Parent
+coroutine.wrap(function()
+    while true do
+        pcall(function()
+            if remote and plr.Character then
+                remote:FireServer("Attack", {Hit = Vector3.new()})
+            end
+        end)
+        task.wait(config.fastSpeed)
     end
-    return ret
-end
+end)()
 
-function SuperAttack()
-    print("[DEBUG] Vào SuperAttack")
+game:GetService("RunService").Heartbeat:Connect(function()
+    local char = plr.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
     
-    local AC = CbFw2.activeController
-    if not AC then
-        warn("[DEBUG] activeController = nil")
-        VirtualUser:ClickButton1(Vector2.new())
-        return
-    end
-    print("[DEBUG] activeController OK")
-    
-    if not AC.blades or not AC.blades[1] then
-        warn("[DEBUG] Không có blades")
-        return
-    end
-    print("[DEBUG] Blades OK")
-    
-    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then
-        warn("[DEBUG] Không có HumanoidRootPart")
-        return
-    end
-    
-    local bladehit = RigLib.getBladeHits(plr.Character, {hrp}, getgenv().Range)
-    print("[DEBUG] Bladehits:", #bladehit)
-    
-    local targets = {}
-    local hash = {}
-    
-    for _, v in pairs(bladehit) do
-        local model = v.Parent
-        if model:FindFirstChild("HumanoidRootPart") and model \~= plr.Character and not hash[model] then
-            local hum = model:FindFirstChildOfClass("Humanoid")
-            local isPlayer = Players:GetPlayerFromCharacter(model)
-            if hum and hum.Health > 0 and (not getgenv().BountyOnly or isPlayer) then
-                table.insert(targets, model.HumanoidRootPart)
-                hash[model] = true
+    for _, obj in pairs(workspace:GetDescendants()) do
+        local hum = obj:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health > 0 and obj ~= char then
+            local objRoot = obj:FindFirstChild("HumanoidRootPart")
+            if objRoot and (root.Position - objRoot.Position).Magnitude <= config.auraRadius then
+                pcall(function()
+                    hum:TakeDamage(config.auraDamage)
+                end)
             end
         end
     end
-    
-    print("[DEBUG] Targets hợp lệ:", #targets)
-    
-    if #targets > 0 then
-        print("[DEBUG] Bắt đầu spoof - Targets:", #targets)
-        
-        local u8 = debug.getupvalue(AC.attack, 5)
-        local u9 = debug.getupvalue(AC.attack, 6)
-        local u7 = debug.getupvalue(AC.attack, 4)
-        local u10 = debug.getupvalue(AC.attack, 7)
-        
-        if not (u8 and u9 and u7 and u10) then
-            warn("[DEBUG] Upvalue nil")
-            return
-        end
-        
-        local u12 = (u8 * 798405 + u7 * 727595) % u9
-        local u13 = u7 * 798405
-        (function()
-            u12 = (u12 * u9 + u13) % 1099511627776
-            u8 = math.floor(u12 / u9)
-            u7 = u12 - u8 * u9
-        end)()
-        u10 = u10 + 1
-        
-        debug.setupvalue(AC.attack, 5, u8)
-        debug.setupvalue(AC.attack, 6, u9)
-        debug.setupvalue(AC.attack, 4, u7)
-        debug.setupvalue(AC.attack, 7, u10)
-        
-        if not getgenv().NoAnim then
-            pcall(function()
-                for _, anim in pairs(AC.animator.anims.basic) do
-                    anim:Play()
-                end
-            end)
-        end
-        
-        local blade = GetCurrentBlade()
-        if blade and plr.Character:FindFirstChildOfClass("Tool") then
-            print("[DEBUG] Gửi hit - Blade:", blade.Name)
-            ReplicatedStorage.RigControllerEvent:FireServer("weaponChange", tostring(blade))
-            ReplicatedStorage.Remotes.Validator:FireServer(math.floor(u12 / 1099511627776 * 16777215), u10)
-            ReplicatedStorage.RigControllerEvent:FireServer("hit", targets, 1, "")
-            print("[DEBUG] Hit đã gửi cho", #targets, "mục tiêu")
-        else
-            warn("[DEBUG] Không gửi hit - Blade:", blade, "Tool:", plr.Character:FindFirstChildOfClass("Tool"))
-        end
-    else
-        print("[DEBUG] Không có target trong range")
-    end
-    
-    if getgenv().FruitSpam and IsFruitEquipped() then
-        print("[DEBUG] Spam skill fruit")
-        for _, sk in ipairs(fruitSkills) do
-            local key = Enum.KeyCode[sk]
-            VirtualInputManager:SendKeyEvent(true, key, false, game)
-            task.wait(0.001)
-            VirtualInputManager:SendKeyEvent(false, key, false, game)
-        end
-    end
-end
-
-spawn(function()
-    while getgenv().SuperAttack and getgenv().AutoEquip do
-        if plr.Character and not plr.Character:FindFirstChildOfClass("Tool") then
-            local tool = plr.Backpack:FindFirstChildOfClass("Tool")
-            if tool then
-                print("[DEBUG] Auto equip:", tool.Name)
-                plr.Character.Humanoid:EquipTool(tool)
-            else
-                print("[DEBUG] Không tìm thấy tool trong backpack")
-            end
-        end
-        task.wait(0.5)
-    end
-end)
-
-spawn(function()
-    print("[DEBUG] Vòng lặp SuperAttack bắt đầu")
-    while getgenv().SuperAttack do
-        pcall(SuperAttack)
-        task.wait(getgenv().SuperFast and 0 or 0.03)
-    end
-    print("[DEBUG] Vòng lặp SuperAttack dừng")
 end)
