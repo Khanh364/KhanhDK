@@ -1,39 +1,72 @@
-local plr = game.Players.LocalPlayer
-local rs = game:GetService("ReplicatedStorage")
-local remote = rs:FindFirstChild("MainEvent") or rs:FindFirstChild("RemoteEvent")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
-local config = {
-    fastSpeed = 0.0001,
-    auraRadius = 30,
-    auraDamage = 999,
-}
+local player = Players.LocalPlayer
+local CombatFramework = require(player.PlayerScripts:WaitForChild("CombatFramework"))
+local RigLib = require(ReplicatedStorage.CombatFramework.RigLib)
 
-coroutine.wrap(function()
-    while true do
-        pcall(function()
-            if remote and plr.Character then
-                remote:FireServer("Attack", {Hit = Vector3.new()})
-            end
-        end)
-        task.wait(config.fastSpeed)
-    end
-end)()
+local baseSpeed = 0.08
+local maxRange = 80
+local maxSpam = 8
 
-game:GetService("RunService").Heartbeat:Connect(function()
-    local char = plr.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+local function getClosest()
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
     
-    for _, obj in pairs(workspace:GetDescendants()) do
-        local hum = obj:FindFirstChildOfClass("Humanoid")
-        if hum and hum.Health > 0 and obj ~= char then
-            local objRoot = obj:FindFirstChild("HumanoidRootPart")
-            if objRoot and (root.Position - objRoot.Position).Magnitude <= config.auraRadius then
-                pcall(function()
-                    hum:TakeDamage(config.auraDamage)
-                end)
-            end
+    local closest, minDist = nil, maxRange
+    for _, p in pairs(Players:GetPlayers()) do
+        if p \~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character.Humanoid.Health > 0 then
+            local dist = (root.Position - p.Character.HumanoidRootPart.Position).Magnitude
+            if dist < minDist then minDist = dist; closest = p end
+        end
+    end
+    return closest
+end
+
+task.spawn(function()
+    while true do
+        local randDelay = baseSpeed + math.random(2,12)/100
+        task.wait(randDelay)
+        
+        local ac = CombatFramework.activeController
+        if not ac or not ac.active or not player.Character then continue end
+        
+        local target = getClosest()
+        if not target then continue end
+        
+        local root = player.Character.HumanoidRootPart
+        local tRoot = target.Character.HumanoidRootPart
+        
+        local dist = (root.Position - tRoot.Position).Magnitude
+        if dist < 60 then
+            local randVel = 30 + math.random(0,20)
+            local bv = root:FindFirstChild("BodyVelocity") or Instance.new("BodyVelocity", root)
+            bv.MaxForce = Vector3.new(4e5, 0, 4e5)
+            bv.Velocity = (tRoot.Position - root.Position).Unit * randVel
+        end
+        
+        local hits = RigLib.getBladeHits(root, {tRoot}, maxRange)
+        if #hits == 0 then continue end
+        
+        local ups = debug.getupvalues(ac.attack)
+        if ups and #ups >= 7 then
+            local u8,u9,u7,u10 = ups[5],ups[6],ups[4],ups[7]
+            local newVal = (u8 * 798405 + u7 * 727595) % u9
+            debug.setupvalue(ac.attack, 5, math.floor(newVal / u9))
+            debug.setupvalue(ac.attack, 4, newVal - math.floor(newVal / u9) * u9)
+            debug.setupvalue(ac.attack, 7, u10 + 1)
+        end
+        
+        local randSpam = 6 + math.random(0,2)
+        for i = 1, randSpam do
+            pcall(ac.attack)
+        end
+        
+        if ac.animator and ac.animator.anims.basic[1] then
+            ac.animator.anims.basic[1]:Play()
         end
     end
 end)
+
+print("ANTI-SUS FA MẠNH NHẤT LOADED")
