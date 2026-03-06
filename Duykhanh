@@ -3,7 +3,7 @@ local rs = game:GetService("ReplicatedStorage")
 local remote = rs:FindFirstChild("MainEvent") or rs:FindFirstChild("RemoteEvent")
 
 local config = {
-    fastSpeed = 0.03,
+    fastSpeed = 0.0001,
     auraRadius = 30,
     auraDamage = 999,
 }
