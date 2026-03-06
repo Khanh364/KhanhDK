@@ -1,45 +1,113 @@
-getgenv().Config = {
-    ["FastAttack"] = true,
-    ["ClickAttack"] = true
+getgenv().Config = { 
+    FastAttack = true, 
+    AimLock = true, 
+    MaxDistAim = 100,
+    Prediction = 0.165,
+    SmoothFactor = 0.45
 }
 
-coroutine.wrap(function()
-    local StopCamera = require(game.ReplicatedStorage.Util.CameraShaker)
-    StopCamera:Stop()
-    for _, v in pairs(getreg()) do
-        if typeof(v) == "function" and getfenv(v).script == game:GetService("Players").LocalPlayer.PlayerScripts.CombatFramework then
-            for _, v2 in pairs(debug.getupvalues(v)) do
-                if typeof(v2) == "table" then
-                    spawn(function()
-                        game:GetService("RunService").RenderStepped:Connect(function()
-                            if getgenv().Config.FastAttack then
-                                pcall(function()
-                                    v2.activeController.timeToNextAttack = -(math.huge^math.huge^math.huge)
-                                    v2.activeController.attacking = false
-                                    v2.activeController.increment = 4
-                                    v2.activeController.blocking = false
-                                    v2.activeController.hitboxMagnitude = 150
-                                    v2.activeController.humanoid.AutoRotate = true
-                                    v2.activeController.focusStart = 0
-                                    v2.activeController.currentAttackTrack = 0
-                                    sethiddenproperty(game:GetService("Players").LocalPlayer, "SimulationRadius", math.huge)
-                                end)
-                            end
-                        end)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LP = Players.LocalPlayer
+
+local StopCamera = require(game.ReplicatedStorage.Util.CameraShaker)
+StopCamera:Stop()
+
+pcall(sethiddenproperty, LP, "SimulationRadius", math.huge)
+LP.ReplicationFocus = workspace
+
+spawn(function()
+    RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local char = LP.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart:SetNetworkOwner(LP)
+                for _, obj in pairs(char:GetChildren()) do
+                    if obj:IsA("Tool") and obj:FindFirstChild("Handle") then
+                        obj.Handle:SetNetworkOwner(LP)
+                    end
+                end
+            end
+        end)
+    end)
+end)
+
+for _, v in pairs(getreg()) do
+    if typeof(v) == "function" and getfenv(v).script == LP.PlayerScripts:FindFirstChild("CombatFramework") then
+        for _, v2 in pairs(debug.getupvalues(v)) do
+            if typeof(v2) == "table" then
+                spawn(function()
+                    RunService.RenderStepped:Connect(function()
+                        if getgenv().Config.FastAttack then
+                            pcall(function()
+                                v2.activeController.timeToNextAttack = math.random(-1.2, -0.05)
+                                v2.activeController.attacking = false
+                                v2.activeController.increment = 2.5
+                                v2.activeController.blocking = false
+                                v2.activeController.hitboxMagnitude = 65
+                                v2.activeController.humanoid.AutoRotate = true
+                                v2.activeController.focusStart = 0
+                            end)
+                        end
                     end)
+                end)
+            end
+        end
+    end
+end
+
+local aiming = false
+local target = nil
+
+local function GetClosest()
+    local closest, minDist = nil, getgenv().Config.MaxDistAim
+    local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil end
+    local myPos = myRoot.Position
+    
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr \~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local hum = plr.Character:FindFirstChild("Humanoid")
+            if hum and hum.Health > 0 and (not plr.Team or plr.Team \~= LP.Team) then
+                local dist = (myPos - plr.Character.HumanoidRootPart.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    closest = plr
                 end
             end
         end
     end
-end)()
+    return closest
+end
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and getgenv().Config.AimLock then
+        aiming = true
+        target = GetClosest()
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        aiming = false
+        target = nil
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if aiming and target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = target.Character.HumanoidRootPart
+        local predictPos = hrp.Position + (hrp.Velocity * getgenv().Config.Prediction)
+        local targetCFrame = CFrame.new(Camera.CFrame.Position, predictPos)
+        Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, getgenv().Config.SmoothFactor)
+    end
+end)
 
 spawn(function()
-    game:GetService("RunService").RenderStepped:Connect(function()
-        if getgenv().Config.ClickAttack then
-            pcall(function()
-                game:GetService'VirtualUser':CaptureController()
-                game:GetService'VirtualUser':Button1Down(Vector2.new(0,1,0,1))
-            end)
-        end
-    end)
+    while task.wait(60) do
+        game:GetService("VirtualUser"):CaptureController()
+        game:GetService("VirtualUser"):ClickButton1(Vector2.new())
+    end
 end)
