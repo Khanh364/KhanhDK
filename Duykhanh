@@ -3,8 +3,9 @@ getgenv().Config = {
     AimLock = true, 
     MaxDistAim = 90,
     Prediction = 0.14,
-    SmoothFactor = 0.25,
-    FPSBoost = true
+    SmoothFactor = 0.6,
+    FPSBoost = true,
+    AutoFace = true
 }
 
 local Players = game:GetService("Players")
@@ -76,8 +77,7 @@ task.spawn(function()
     end
 end)
 
-local aiming = true
-local target = nil
+local aiming = false
 
 local function GetClosest()
     local closest, minDist = nil, getgenv().Config.MaxDistAim
@@ -105,23 +105,31 @@ end
 UserInputService.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 and getgenv().Config.AimLock then
         aiming = true
-        target = GetClosest()
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
         aiming = false
-        target = nil
     end
 end)
 
 RunService.RenderStepped:Connect(function()
-    if aiming and target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = target.Character.HumanoidRootPart
-        local predictPos = hrp.Position + (hrp.Velocity * getgenv().Config.Prediction)
-        local lookAt = CFrame.lookAt(Camera.CFrame.Position, predictPos)
-        Camera.CFrame = Camera.CFrame:Lerp(lookAt, getgenv().Config.SmoothFactor)
+    if aiming and getgenv().Config.AimLock then
+        local target = GetClosest()
+        
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = target.Character.HumanoidRootPart
+            local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+            local predictPos = hrp.Position + (hrp.Velocity * getgenv().Config.Prediction)
+            local lookAt = CFrame.lookAt(Camera.CFrame.Position, predictPos)
+            
+            Camera.CFrame = Camera.CFrame:Lerp(lookAt, getgenv().Config.SmoothFactor)
+            
+            if getgenv().Config.AutoFace and myRoot then
+                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(predictPos.X, myRoot.Position.Y, predictPos.Z))
+            end
+        end
     end
 end)
 
