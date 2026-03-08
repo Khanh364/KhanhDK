@@ -3,14 +3,44 @@ getgenv().Config = {
     AimLock = true, 
     MaxDistAim = 90,
     Prediction = 0.14,
-    SmoothFactor = 0.25
+    SmoothFactor = 0.25,
+    FPSBoost = true
 }
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LP = Players.LocalPlayer
+
+if getgenv().Config.FPSBoost then
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    Lighting.Brightness = 1
+
+    local function Optimize(v)
+        if v:IsA("Part") or v:IsA("MeshPart") or v:IsA("UnionOperation") then
+            v.Material = Enum.Material.Plastic
+            v.Reflectance = 0
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v.Enabled = false
+        elseif v:IsA("PostEffect") or v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") then
+            v.Enabled = false
+        end
+    end
+
+    for _, v in pairs(game:GetDescendants()) do
+        Optimize(v)
+    end
+
+    game.DescendantAdded:Connect(function(v)
+        Optimize(v)
+    end)
+end
 
 pcall(function()
     local Shaker = require(game.ReplicatedStorage.Util.CameraShaker)
