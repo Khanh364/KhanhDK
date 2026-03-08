@@ -76,7 +76,7 @@ task.spawn(function()
     end
 end)
 
-local aiming = true
+local aiming = false
 local target = nil
 
 local function GetClosest()
