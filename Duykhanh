@@ -34,13 +34,8 @@ if getgenv().Config.FPSBoost then
         end
     end
 
-    for _, v in pairs(game:GetDescendants()) do
-        Optimize(v)
-    end
-
-    game.DescendantAdded:Connect(function(v)
-        Optimize(v)
-    end)
+    for _, v in pairs(game:GetDescendants()) do Optimize(v) end
+    game.DescendantAdded:Connect(Optimize)
 end
 
 pcall(function()
@@ -48,37 +43,39 @@ pcall(function()
     if Shaker then Shaker:Stop() end
 end)
 
-local function SetOwner(char)
-    pcall(function()
-        char:WaitForChild("HumanoidRootPart"):SetNetworkOwner(LP)
-    end)
-end
-LP.CharacterAdded:Connect(SetOwner)
-if LP.Character then SetOwner(LP.Character) end
-
-task.spawn(function()
-    while task.wait() do
-        if getgenv().Config.FastAttack then
-            pcall(function()
-                for _, v in pairs(getreg()) do
-                    if typeof(v) == "function" and getfenv(v).script and getfenv(v).script.Name == "CombatFramework" then
-                        for _, v2 in pairs(debug.getupvalues(v)) do
-                            if typeof(v2) == "table" and v2.activeController then
-                                v2.activeController.timeToNextAttack = 0
-                                v2.activeController.attacking = false
-                                v2.activeController.hitboxMagnitude = 55
-                                v2.activeController.increment = 3
-                            end
-                        end
-                    end
+local CachedController = nil
+local function GetCombat()
+    if CachedController then return CachedController end
+    for _, v in pairs(getreg()) do
+        if typeof(v) == "function" and getfenv(v).script and getfenv(v).script.Name == "CombatFramework" then
+            for _, v2 in pairs(debug.getupvalues(v)) do
+                if typeof(v2) == "table" and v2.activeController then
+                    CachedController = v2.activeController
+                    return CachedController
                 end
-            end)
+            end
         end
+    end
+end
+
+RunService.Stepped:Connect(function()
+    if getgenv().Config.FastAttack then
+        pcall(function()
+            local combat = GetCombat()
+            if combat then
+                combat.timeToNextAttack = 0
+                combat.attacking = false
+                combat.hitboxMagnitude = 60
+                combat.increment = 4
+                if combat.attack then
+                    combat:attack()
+                end
+            end
+        end)
     end
 end)
 
 local aiming = false
-
 local function GetClosest()
     local closest, minDist = nil, getgenv().Config.MaxDistAim
     local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
@@ -117,15 +114,11 @@ end)
 RunService.RenderStepped:Connect(function()
     if aiming and getgenv().Config.AimLock then
         local target = GetClosest()
-        
         if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = target.Character.HumanoidRootPart
             local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
             local predictPos = hrp.Position + (hrp.Velocity * getgenv().Config.Prediction)
-            local lookAt = CFrame.lookAt(Camera.CFrame.Position, predictPos)
-            
-            Camera.CFrame = Camera.CFrame:Lerp(lookAt, getgenv().Config.SmoothFactor)
-            
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, predictPos), getgenv().Config.SmoothFactor)
             if getgenv().Config.AutoFace and myRoot then
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(predictPos.X, myRoot.Position.Y, predictPos.Z))
             end
