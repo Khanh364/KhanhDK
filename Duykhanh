@@ -1,4 +1,4 @@
-Local player = game:GetService("Players").LocalPlayer
+local player = game:GetService("Players").LocalPlayer
 local runService = game:GetService("RunService")
 local workspace = game:GetService("Workspace")
 local lighting = game:GetService("Lighting")
@@ -10,7 +10,7 @@ getgenv().AntiSitEnabled = true
 getgenv().Noclip = true
 getgenv().HitboxSize = 25
 getgenv().AttackSpeed = 0.0000001
-getgenv().FlySpeed = 200
+getgenv().FlySpeed = 350
 getgenv().FlyEnabled = true
 getgenv().RemoveAttackEffects = true
 
