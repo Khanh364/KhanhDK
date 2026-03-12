@@ -11,7 +11,7 @@ getgenv().Config = {
     WalkOnWater = true,
     RemoveEffects = true,
     AutoFace = true,
-    TargetDistance = 500,
+    TargetDistance = 1000,
     Fly = true,
     FlySpeed = 350,
     Camlock = true,
@@ -25,7 +25,8 @@ getgenv().Config = {
     Prediction = true,
     PredictionIntensity = 0.15,
     TeleportToTarget = false,
-    TpOffset = Vector3.new(0, 5, 2)
+    TpOffset = Vector3.new(0, 5, 2),
+    AutoHopWhenNoTargets = true 
 }
 
 local Players = game:GetService("Players")
@@ -89,7 +90,6 @@ local function ServerHop()
     local PlaceID = game.PlaceId
     local JobID = game.JobId
     local API = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"
-    
     local function GetServers(cursor)
         local url = API .. (cursor and "&cursor=" .. cursor or "")
         local success, result = pcall(function()
@@ -97,7 +97,6 @@ local function ServerHop()
         end)
         return success and result or nil
     end
-
     task.spawn(function()
         local cursor = nil
         while true do
@@ -163,7 +162,6 @@ local function ExecuteAttack()
     if not target then return end
     local dist = (target.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
     if dist > getgenv().Config.SafeMagnitude then return end
-
     local controller
     pcall(function() controller = CombatFramework.activeController end)
     if controller and controller.equipped then
@@ -232,7 +230,6 @@ RunService.RenderStepped:Connect(function()
     local myHrp = LocalPlayer.Character.HumanoidRootPart
     waterPart.Position = Vector3.new(myHrp.Position.X, myHrp.Position.Y - 3.5, myHrp.Position.Z)
     waterPart.CanCollide = getgenv().Config.WalkOnWater
-    
     local target = GetNearestTarget()
     if target then
         local targetPos = target.Position
@@ -249,7 +246,6 @@ RunService.RenderStepped:Connect(function()
             myHrp.CFrame = target.CFrame * CFrame.new(getgenv().Config.TpOffset)
         end
     end
-
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = plr.Character.HumanoidRootPart
@@ -289,8 +285,19 @@ for _, plr in pairs(Players:GetPlayers()) do if plr ~= LocalPlayer then CheckAdm
 
 task.spawn(function()
     InitialOptimize()
+    local emptyCount = 0
     while true do
-        if getgenv().Config.FastAttack then ExecuteAttack() end
+        local target = GetNearestTarget()
+        if target then
+            emptyCount = 0
+            if getgenv().Config.FastAttack then ExecuteAttack() end
+        else
+            emptyCount = emptyCount + 1
+        end
+        if getgenv().Config.AutoHopWhenNoTargets and emptyCount >= 50 then
+            ServerHop()
+            break
+        end
         if getgenv().Config.AntiSit and LocalPlayer.Character then
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if hum then hum.Sit = false end
