@@ -17,11 +17,7 @@ Lighting.EnvironmentDiffuseScale = 0
 Lighting.EnvironmentSpecularScale = 0
 
 for _,v in pairs(Lighting:GetChildren()) do
-    if v:IsA("BloomEffect")
-    or v:IsA("BlurEffect")
-    or v:IsA("SunRaysEffect")
-    or v:IsA("ColorCorrectionEffect")
-    or v:IsA("DepthOfFieldEffect") then
+    if v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("DepthOfFieldEffect") then
         v.Enabled = false
     end
 end
@@ -31,9 +27,7 @@ if Terrain then
     Terrain.WaterWaveSpeed = 0
     Terrain.WaterReflectance = 0
     Terrain.WaterTransparency = 1
-    pcall(function()
-        sethiddenproperty(Terrain,"Decoration",false)
-    end)
+    pcall(function() sethiddenproperty(Terrain,"Decoration",false) end)
 end
 
 local function Optimize(v)
@@ -44,43 +38,27 @@ local function Optimize(v)
         v.TextureID = ""
     elseif v:IsA("Decal") or v:IsA("Texture") then
         v.Transparency = 1
-    elseif v:IsA("ParticleEmitter")
-    or v:IsA("Trail")
-    or v:IsA("Smoke")
-    or v:IsA("Fire")
-    or v:IsA("Sparkles")
-    or v:IsA("Explosion") then
+    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Explosion") then
         v:Destroy()
     end
 end
 
-for _,v in pairs(game:GetDescendants()) do
-    Optimize(v)
-end
-
-game.DescendantAdded:Connect(function(v)
-    Optimize(v)
-end)
+for _,v in pairs(game:GetDescendants()) do Optimize(v) end
+game.DescendantAdded:Connect(Optimize)
 
 local function RemoveAccessories(char)
     for _,v in pairs(char:GetChildren()) do
-        if v:IsA("Accessory") then
-            v:Destroy()
-        end
+        if v:IsA("Accessory") then v:Destroy() end
     end
 end
 
-if LP.Character then
-    RemoveAccessories(LP.Character)
-end
+if LP.Character then RemoveAccessories(LP.Character) end
 LP.CharacterAdded:Connect(RemoveAccessories)
 
 workspace.StreamingEnabled = true
 workspace.StreamingTargetRadius = 64
 
-pcall(function()
-    settings().Physics.AllowSleep = true
-end)
+pcall(function() settings().Physics.AllowSleep = true end)
 
 getgenv().Config = { 
     FastAttack = true, 
@@ -98,45 +76,40 @@ getgenv().Config = {
     NoClip = true
 }
 
-local currentTarget = nil
-local RigController = nil
-
-local function GetRigController()
-    if RigController then return RigController end
+-- ==================== FAST ATTACK MỚI NHẤT 2026 ====================
+local function GetActiveController()
     pcall(function()
-        RigController = require(LP.PlayerScripts:WaitForChild("CombatFramework"):WaitForChild("RigController"))
+        return require(LP.PlayerScripts:WaitForChild("CombatFramework")).activeController
     end)
-    return RigController
 end
 
 RunService.Stepped:Connect(function()
+    -- FAST ATTACK (Control Rework fix)
     if getgenv().Config.FastAttack then
         pcall(function()
-            local combat = GetRigController()
-            if combat then
-                combat.timeToNextAttack = 0
-                combat.attacking = false
-                combat.hitboxMagnitude = 60
-                combat.increment = 4
-                combat.blocking = false
+            local ac = GetActiveController()
+            if ac then
+                ac.timeToNextAttack = -(math.huge ^ math.huge ^ math.huge)
+                ac.attacking = false
+                ac.hitboxMagnitude = 60
+                ac.increment = 4
+                ac.blocking = false
             end
         end)
     end
 
+    -- NoClip
     if getgenv().Config.NoClip and LP.Character then
         for _,v in pairs(LP.Character:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.CanCollide = false
-            end
+            if v:IsA("BasePart") then v.CanCollide = false end
         end
     end
 
+    -- AntiStun
     if getgenv().Config.AntiStun and LP.Character then
         pcall(function()
             local hum = LP.Character:FindFirstChild("Humanoid")
-            if hum then
-                hum.PlatformStand = false
-            end
+            if hum then hum.PlatformStand = false end
             for _,v in pairs(LP.Character:GetDescendants()) do
                 if v:IsA("BodyVelocity") or v:IsA("BodyPosition") or v:IsA("BodyAngularVelocity") or v:IsA("BodyGyro") then
                     v:Destroy()
@@ -152,7 +125,7 @@ local function GetClosest()
     if not myRoot then return nil end
     
     for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+        if plr \~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local hum = plr.Character:FindFirstChild("Humanoid")
             if hum and hum.Health > 0 then
                 local dist = (myRoot.Position - plr.Character.HumanoidRootPart.Position).Magnitude
@@ -168,17 +141,16 @@ end
 
 RunService.RenderStepped:Connect(function()
     if getgenv().Config.AutoAim then
-        currentTarget = GetClosest()
-        if currentTarget and currentTarget.Character then
-            local targetRoot = currentTarget.Character:FindFirstChild("HumanoidRootPart")
-            local targetHum = currentTarget.Character:FindFirstChild("Humanoid")
+        local target = GetClosest()
+        if target and target.Character then
+            local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+            local targetHum = target.Character:FindFirstChild("Humanoid")
             if targetHum and targetHum.Health > 0 and targetRoot then
                 local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
                 local predictPos = targetRoot.Position + (targetRoot.Velocity * getgenv().Config.Prediction)
-                Camera.CFrame = Camera.CFrame:Lerp(
-                    CFrame.lookAt(Camera.CFrame.Position, predictPos),
-                    getgenv().Config.SmoothFactor
-                )
+                
+                Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, predictPos), getgenv().Config.SmoothFactor)
+                
                 if getgenv().Config.AutoFace and myRoot then
                     myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(predictPos.X, myRoot.Position.Y, predictPos.Z))
                 end
@@ -189,7 +161,7 @@ end)
 
 task.spawn(function()
     while task.wait(0.07) do
-        if getgenv().Config.AutoAttack and currentTarget then
+        if getgenv().Config.AutoAttack then
             VirtualInputManager:SendMouseButtonEvent(0,0,0,true,game,1)
             task.wait(0.01)
             VirtualInputManager:SendMouseButtonEvent(0,0,0,false,game,1)
@@ -219,9 +191,7 @@ local function SetupAntiSit(char)
     end
 end
 
-if LP.Character then
-    SetupAntiSit(LP.Character)
-end
+if LP.Character then SetupAntiSit(LP.Character) end
 LP.CharacterAdded:Connect(SetupAntiSit)
 
 task.spawn(function()
