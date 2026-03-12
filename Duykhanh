@@ -2,6 +2,7 @@ getgenv().Config = {
     FastAttack = true, 
     AutoAim = true,        
     AutoAttack = true,     
+    AutoClick = true,      
     AntiStun = true,       
     MaxDistAim = 200,      
     Prediction = 0.145,
@@ -145,6 +146,18 @@ task.spawn(function()
             pcall(function()
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
                 task.wait(0.01)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.05) do
+        if getgenv().Config.AutoClick then
+            pcall(function()
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                task.wait(0.015)
                 VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
             end)
         end
