@@ -2,7 +2,10 @@ repeat task.wait() until game:IsLoaded()
 
 local Config = {
     FastAttack = true,
-    AntiStun = true,
+    AttackSpeed = 0, 
+    AttackAmount = 10,
+    AutoM1 = true,
+    NoAnimation = true,
     AntiSit = true,
     Aimlock = true,
     Hitbox = true,
@@ -12,16 +15,18 @@ local Config = {
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local VirtualUser = game:GetService("VirtualUser")
 
-repeat task.wait() until Players.LocalPlayer
 local LocalPlayer = Players.LocalPlayer
 repeat task.wait() until LocalPlayer.Character
 
 local CombatFramework
-pcall(function() CombatFramework = require(LocalPlayer.PlayerScripts.CombatFramework) end)
+pcall(function() 
+    CombatFramework = require(LocalPlayer.PlayerScripts:WaitForChild("CombatFramework")) 
+end)
 
 task.spawn(function()
-    while task.wait() do
+    while true do
         if Config.FastAttack and CombatFramework then
             pcall(function()
                 local controller = CombatFramework.activeController
@@ -29,11 +34,17 @@ task.spawn(function()
                     controller.attackInterval = 0
                     controller.timeToNextAttack = 0
                     controller.hitboxCreated = false
-                    controller.increment = 3
-                    controller:attack()
+                    for i = 1, Config.AttackAmount do
+                        controller:attack()
+                    end
                 end
             end)
         end
+        if Config.AutoM1 then
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton1(Vector2.new())
+        end
+        task.wait(Config.AttackSpeed)
     end
 end)
 
@@ -50,21 +61,20 @@ RunService.Stepped:Connect(function()
         myHum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
     end
 
-    if Config.AntiStun then
-        myHum.PlatformStand = false
-        for _, v in ipairs(char:GetChildren()) do
-            if v:IsA("BodyVelocity") or v:IsA("BodyPosition") or v:IsA("BodyGyro") then
-                v:Destroy()
-            end
-            if v.Name == "Stun" or v.Name == "Ice" or v.Name == "Bind" then
-                v:Destroy()
+    if Config.NoAnimation then
+        local animator = myHum:FindFirstChildOfClass("Animator")
+        if animator then
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                track:Stop()
             end
         end
     end
 
     local target, minDistance = nil, math.huge
 
-    local function CheckTarget(hrp, hum)
+    local function CheckTarget(ent)
+        local hrp = ent:FindFirstChild("HumanoidRootPart")
+        local hum = ent:FindFirstChildOfClass("Humanoid")
         if hrp and hum and hum.Health > 0 then
             if Config.Hitbox then
                 hrp.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
@@ -83,14 +93,14 @@ RunService.Stepped:Connect(function()
 
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character then
-            CheckTarget(plr.Character:FindFirstChild("HumanoidRootPart"), plr.Character:FindFirstChild("Humanoid"))
+            CheckTarget(plr.Character)
         end
     end
 
-    local enemies = Workspace:FindFirstChild("Enemies")
+    local enemies = Workspace:FindFirstChild("Enemies") or Workspace:FindFirstChild("NPCs") or Workspace:FindFirstChild("Mobs")
     if enemies then
         for _, enemy in ipairs(enemies:GetChildren()) do
-            CheckTarget(enemy:FindFirstChild("HumanoidRootPart"), enemy:FindFirstChild("Humanoid"))
+            CheckTarget(enemy)
         end
     end
 
