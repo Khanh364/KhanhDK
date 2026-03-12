@@ -5,7 +5,10 @@ getgenv().Config = {
     Prediction = 0.14,
     SmoothFactor = 0.6,
     FPSBoost = true,
-    AutoFace = true
+    AutoFace = true,
+    AutoLeaveSeat = true,
+    AutoHaki = true,
+    NoClip = true
 }
 
 local Players = game:GetService("Players")
@@ -34,8 +37,8 @@ if getgenv().Config.FPSBoost then
         end
     end
 
-    for _, v in pairs(game:GetDescendants()) do Optimize(v) end
-    game.DescendantAdded:Connect(Optimize)
+    for _, v in pairs(workspace:GetDescendants()) do Optimize(v) end
+    workspace.DescendantAdded:Connect(Optimize)
 end
 
 pcall(function()
@@ -58,6 +61,7 @@ local function GetCombat()
     end
 end
 
+local lastAttack = 0
 RunService.Stepped:Connect(function()
     if getgenv().Config.FastAttack then
         pcall(function()
@@ -67,15 +71,26 @@ RunService.Stepped:Connect(function()
                 combat.attacking = false
                 combat.hitboxMagnitude = 60
                 combat.increment = 4
-                if combat.attack then
+                if combat.attack and (tick() - lastAttack > 0.05) then
+                    lastAttack = tick()
                     combat:attack()
                 end
             end
         end)
     end
+    
+    if getgenv().Config.NoClip and LP.Character then
+        for _, v in pairs(LP.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    end
 end)
 
 local aiming = false
+local currentTarget = nil
+
 local function GetClosest()
     local closest, minDist = nil, getgenv().Config.MaxDistAim
     local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
@@ -99,36 +114,72 @@ local function GetClosest()
     return closest
 end
 
-UserInputService.InputBegan:Connect(function(input)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
     if input.UserInputType == Enum.UserInputType.MouseButton2 and getgenv().Config.AimLock then
         aiming = true
+        currentTarget = GetClosest()
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
         aiming = false
+        currentTarget = nil
     end
 end)
 
 RunService.RenderStepped:Connect(function()
-    if aiming and getgenv().Config.AimLock then
-        local target = GetClosest()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = target.Character.HumanoidRootPart
+    if aiming and getgenv().Config.AimLock and currentTarget then
+        local targetChar = currentTarget.Character
+        local targetHum = targetChar and targetChar:FindFirstChild("Humanoid")
+        local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+        
+        if targetHum and targetHum.Health > 0 and targetRoot then
             local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-            local predictPos = hrp.Position + (hrp.Velocity * getgenv().Config.Prediction)
+            local predictPos = targetRoot.Position + (targetRoot.Velocity * getgenv().Config.Prediction)
             Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, predictPos), getgenv().Config.SmoothFactor)
             if getgenv().Config.AutoFace and myRoot then
                 myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(predictPos.X, myRoot.Position.Y, predictPos.Z))
             end
+        else
+            currentTarget = GetClosest()
+        end
+    end
+end)
+
+local function SetupAntiSit(character)
+    local humanoid = character:WaitForChild("Humanoid", 10)
+    if humanoid then
+        humanoid:GetPropertyChangedSignal("Sit"):Connect(function()
+            if getgenv().Config.AutoLeaveSeat and humanoid.Sit then
+                humanoid.Sit = false
+                humanoid.Jump = true 
+            end
+        end)
+    end
+end
+if LP.Character then SetupAntiSit(LP.Character) end
+LP.CharacterAdded:Connect(SetupAntiSit)
+
+task.spawn(function()
+    while task.wait(5) do
+        if getgenv().Config.AutoHaki then
+            pcall(function()
+                local char = LP.Character
+                if char and not char:FindFirstChild("HasBuso") then
+                    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Buso")
+                end
+            end)
         end
     end
 end)
 
 task.spawn(function()
     while task.wait(60) do
-        game:GetService("VirtualUser"):CaptureController()
-        game:GetService("VirtualUser"):ClickButton1(Vector2.new(0,0))
+        pcall(function()
+            game:GetService("VirtualUser"):CaptureController()
+            game:GetService("VirtualUser"):ClickButton1(Vector2.new(0,0))
+        end)
     end
 end)
