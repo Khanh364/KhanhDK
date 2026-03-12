@@ -48,7 +48,6 @@ getgenv().Config = {
     Fly = true,
     FlySpeed = 350,
     Camlock = true,
-    DeleteMap = true,
     AntiAdmin = true,
     ServerHopOnAdmin = true,
     LowPlayerServer = true,
@@ -109,13 +108,6 @@ local function LowGFX(v)
     end
 end
 
-local function ClearMap()
-    if not getgenv().Config.DeleteMap then return end
-    for _, obj in pairs(workspace:GetChildren()) do
-        if not IsEssential(obj) then pcall(function() obj:Destroy() end) end
-    end
-end
-
 local function InitialOptimize()
     settings().Rendering.QualityLevel = 1
     lighting.GlobalShadows = false
@@ -126,7 +118,6 @@ local function InitialOptimize()
             v.Enabled = false
         end
     end
-    ClearMap()
     ClearCombatEffects()
     for _, v in pairs(workspace:GetDescendants()) do LowGFX(v) end
 end
@@ -256,10 +247,6 @@ end
 
 workspace.ChildAdded:Connect(function(child)
     task.spawn(function()
-        if getgenv().Config.DeleteMap and not IsEssential(child) then
-            task.wait(0.1)
-            if not IsEssential(child) then child:Destroy() return end
-        end
         if getgenv().Config.RemoveGameEffects and (child:IsA("Part") or child:IsA("MeshPart")) and not IsEssential(child) then
             local name = child.Name:lower()
             if name:find("slash") or name:find("hit") or name:find("effect") or name:find("ring") or name:find("magic") then
