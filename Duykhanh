@@ -65,16 +65,16 @@ getgenv().Config = {
     FastFruitM1 = true,        
     AutoAim = true,        
     AntiStun = true,       
-    MaxDistAim = 200,      
-    Prediction = 0.145,
-    SmoothFactor = 0.55,
+    MaxDistAim = 110,          
+    Prediction = 0.135,
+    SmoothFactor = 0.28,
     AutoFace = true,
     AutoLeaveSeat = true,
     AutoHaki = true,
     NoClip = true,
     
     AutoServerHop = {
-        Enable = true,
+        Enable = false,        
         MinPlayers = 5,         
         CheckInterval = 30,
         HopDelay = 3,
@@ -147,11 +147,48 @@ RunService.Stepped:Connect(function()
     end
 end)
 
+local currentTarget = nil
+local lockTime = 0
+local LOCK_DURATION = 7
+local currentHighlight = nil
+
+local function UpdateTargetESP()
+    if currentHighlight then
+        currentHighlight:Destroy()
+        currentHighlight = nil
+    end
+    
+    if currentTarget and currentTarget.Character then
+        local char = currentTarget.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            currentHighlight = Instance.new("Highlight")
+            currentHighlight.Adornee = char
+            currentHighlight.FillColor = Color3.fromRGB(255, 0, 0)
+            currentHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            currentHighlight.FillTransparency = 0.4
+            currentHighlight.OutlineTransparency = 0
+            currentHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            currentHighlight.Parent = workspace
+        end
+    end
+end
+
 local function GetClosest()
-    local closest, minDist = nil, getgenv().Config.MaxDistAim
     local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
     if not myRoot then return nil end
     
+    if currentTarget and currentTarget.Character then
+        local hum = currentTarget.Character:FindFirstChild("Humanoid")
+        local root = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+        if hum and hum.Health > 0 and root then
+            local dist = (myRoot.Position - root.Position).Magnitude
+            if dist <= getgenv().Config.MaxDistAim and (tick() - lockTime) < LOCK_DURATION then
+                return currentTarget
+            end
+        end
+    end
+    
+    local closest, minDist = nil, getgenv().Config.MaxDistAim
     for _, plr in pairs(Players:GetPlayers()) do
         if plr \~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local hum = plr.Character:FindFirstChild("Humanoid")
@@ -164,6 +201,16 @@ local function GetClosest()
             end
         end
     end
+    
+    if closest and closest \~= currentTarget then
+        currentTarget = closest
+        lockTime = tick()
+        UpdateTargetESP()
+    elseif not closest and currentTarget then
+        currentTarget = nil
+        UpdateTargetESP()
+    end
+    
     return closest
 end
 
@@ -256,3 +303,13 @@ if hopCfg.Enable then
         end
     end)
 end
+
+Players.PlayerRemoving:Connect(function(plr)
+    if plr == currentTarget then
+        if currentHighlight then 
+            currentHighlight:Destroy() 
+            currentHighlight = nil 
+        end
+        currentTarget = nil
+    end
+end)
