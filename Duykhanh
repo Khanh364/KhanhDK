@@ -2,47 +2,29 @@ local player = game:GetService("Players").LocalPlayer
 local runService = game:GetService("RunService")
 local workspace = game:GetService("Workspace")
 local lighting = game:GetService("Lighting")
-local terrain = workspace.Terrain
 local getgenv = getgenv or function() return _G end
 
 getgenv().FastAttack = true
 getgenv().AntiSitEnabled = true
 getgenv().Noclip = true
-getgenv().HitboxSize = 80
-getgenv().RemoveAttackEffects = true
+getgenv().HitboxSize = 15
+getgenv().AttackSpeed = 0.1
+getgenv().FlySpeed = 150
+getgenv().FlyEnabled = true
 
 local function OptimizePerformance()
     lighting.GlobalShadows = false
     lighting.FogEnd = 9e9
-    lighting.Brightness = 0
+    lighting.Brightness = 1
     for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("BasePart") then
+        if v:IsA("BasePart") and not v:IsDescendantOf(player.Character) then
             v.Material = Enum.Material.SmoothPlastic
-            v.Reflectance = 0
-        elseif v:IsA("Decal") or v:IsA("Texture") or v:IsA("ParticleEmitter") or v:IsA("Trail") then
-            v:Destroy()
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v.Enabled = false
         end
-    end
-    if terrain then
-        terrain.WaterWaveSize = 0
-        terrain.WaterWaveSpeed = 0
-        terrain.WaterReflectance = 0
-        terrain.WaterTransparency = 0
     end
 end
 OptimizePerformance()
-
-local function RemoveVFX(child)
-    if not getgenv().RemoveAttackEffects then return end
-    task.wait()
-    if child:IsA("ParticleEmitter") or child:IsA("Trail") or child:IsA("Beam") or child:IsA("Explosion") or child:IsA("Fire") or child:IsA("Smoke") or child:IsA("Sparkles") then
-        pcall(function() child:Destroy() end)
-    elseif child:IsA("BasePart") and (child.Name:lower():match("effect") or child.Name:lower():match("slash") or child.Name:lower():match("magic")) then
-        pcall(function() child:Destroy() end)
-    end
-end
-
-workspace.DescendantAdded:Connect(RemoveVFX)
 
 local function AntiSit(character)
     local humanoid = character:WaitForChild("Humanoid", 5)
@@ -51,44 +33,45 @@ local function AntiSit(character)
     end
 end
 
-local function AntiStun(character)
-    character.ChildAdded:Connect(function(child)
-        if child.Name:lower():match("stun") or child.Name:lower():match("frozen") or child.Name:lower():match("ice") then
-            task.wait()
-            child:Destroy()
-        end
-    end)
-    character.DescendantAdded:Connect(RemoveVFX)
-end
+player.CharacterAdded:Connect(AntiSit)
+if player.Character then AntiSit(player.Character) end
 
-player.CharacterAdded:Connect(function(character)
-    AntiSit(character)
-    AntiStun(character)
-end)
-
-if player.Character then
-    AntiSit(player.Character)
-    AntiStun(player.Character)
-end
-
-local function ExecuteCombat()
-    if not player.Character or not getgenv().FastAttack then return end
-    local tool = player.Character:FindFirstChildOfClass("Tool")
-    if tool then
-        for _, remote in pairs(tool:GetDescendants()) do
-            if remote:IsA("RemoteEvent") then
-                remote:FireServer()
+task.spawn(function()
+    while true do
+        task.wait()
+        if getgenv().FlyEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = player.Character.HumanoidRootPart
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local moveDir = humanoid.MoveDirection
+            if moveDir.Magnitude > 0 then
+                hrp.Velocity = moveDir * getgenv().FlySpeed + Vector3.new(0, 2, 0)
+            else
+                hrp.Velocity = Vector3.new(0, 1.5, 0)
             end
         end
     end
-end
+end)
 
-runService.Heartbeat:Connect(ExecuteCombat)
+task.spawn(function()
+    while true do
+        task.wait(getgenv().AttackSpeed)
+        if getgenv().FastAttack and player.Character then
+            local tool = player.Character:FindFirstChildOfClass("Tool")
+            if tool then
+                for _, remote in pairs(tool:GetDescendants()) do
+                    if remote:IsA("RemoteEvent") then
+                        remote:FireServer()
+                    end
+                end
+            end
+        end
+    end
+end)
 
 runService.Stepped:Connect(function()
     if getgenv().Noclip and player.Character then
         for _, part in pairs(player.Character:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide then
+            if part:IsA("BasePart") then
                 part.CanCollide = false
             end
         end
@@ -102,13 +85,11 @@ runService.RenderStepped:Connect(function()
             local humanoid = v.Character:FindFirstChild("Humanoid")
             if humanoid and humanoid.Health > 0 then
                 hrp.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
-                hrp.Transparency = 0.8
-                hrp.BrickColor = BrickColor.new("Really red")
-                hrp.Material = Enum.Material.Neon
+                hrp.Transparency = 0.9
+                hrp.BrickColor = BrickColor.new("White")
                 hrp.CanCollide = false
             else
                 hrp.Size = Vector3.new(2, 2, 1)
-                hrp.Transparency = 1
             end
         end
     end
