@@ -26,7 +26,8 @@ getgenv().Config = {
     PredictionIntensity = 0.15,
     TeleportToTarget = false,
     TpOffset = Vector3.new(0, 5, 2),
-    AutoHopWhenNoTargets = true 
+    AutoHopWhenNoTargets = true,
+    InfEnergy = true
 }
 
 local Players = game:GetService("Players")
@@ -192,9 +193,14 @@ local function ApplyESP(plr)
     end
 end
 
-local function SetupAnimationHook(char)
+local function SetupCharacter(char)
     local humanoid = char:WaitForChild("Humanoid", 5)
     if not humanoid then return end
+    
+    if getgenv().Config.AntiSit then
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+    end
+    
     humanoid.AnimationPlayed:Connect(function(track)
         if getgenv().Config.NoAnimation then
             local animName = track.Name:lower()
@@ -216,8 +222,8 @@ workspace.ChildAdded:Connect(function(child)
     end)
 end)
 
-LocalPlayer.CharacterAdded:Connect(SetupAnimationHook)
-if LocalPlayer.Character then SetupAnimationHook(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(SetupCharacter)
+if LocalPlayer.Character then SetupCharacter(LocalPlayer.Character) end
 
 local waterPart = Instance.new("Part", workspace)
 waterPart.Name = "WaterPlatform"
@@ -230,6 +236,7 @@ RunService.RenderStepped:Connect(function()
     local myHrp = LocalPlayer.Character.HumanoidRootPart
     waterPart.Position = Vector3.new(myHrp.Position.X, myHrp.Position.Y - 3.5, myHrp.Position.Z)
     waterPart.CanCollide = getgenv().Config.WalkOnWater
+    
     local target = GetNearestTarget()
     if target then
         local targetPos = target.Position
@@ -246,6 +253,11 @@ RunService.RenderStepped:Connect(function()
             myHrp.CFrame = target.CFrame * CFrame.new(getgenv().Config.TpOffset)
         end
     end
+
+    if getgenv().Config.InfEnergy and LocalPlayer.Character:FindFirstChild("Energy") then
+        LocalPlayer.Character.Energy.Value = LocalPlayer.Character.Energy.MaxValue
+    end
+
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = plr.Character.HumanoidRootPart
@@ -300,7 +312,7 @@ task.spawn(function()
         end
         if getgenv().Config.AntiSit and LocalPlayer.Character then
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if hum then hum.Sit = false end
+            if hum and hum.Sit then hum.Sit = false end
         end
         task.wait(0.1)
     end
