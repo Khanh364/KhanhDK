@@ -13,7 +13,7 @@ getgenv().Config = {
     AutoFace = true,
     TargetDistance = 500,
     Fly = true,
-    FlySpeed = 350,
+    FlySpeed = 250,
     Camlock = true
 }
 
