@@ -12,13 +12,13 @@ getgenv().AntiSitEnabled = true
 getgenv().Noclip = true
 
 getgenv().AutoAimbot = true 
-getgenv().AutoApproach = true 
+getgenv().AutoApproach = false -- TẮT cái này để nhân vật đứng im
 getgenv().TargetRadius = 150 
 getgenv().Prediction = 0.165 
 getgenv().Smoothness = 0.5 
 
 getgenv().HitboxEnabled = true
-getgenv().HitboxSize = 35 
+getgenv().HitboxSize = 80 -- TĂNG HITBOX LÊN 80 để chém xa trúng mục tiêu
 getgenv().HitboxTransparency = 0.6 
 
 getgenv().RemoveAttackEffects = true
@@ -169,9 +169,9 @@ runService.RenderStepped:Connect(function()
 
         local predictedPos = targetHRP.Position + (targetHRP.Velocity * getgenv().Prediction)
         
-        -- Áp sát và ÉP NHÂN VẬT QUAY MẶT vào kẻ địch để M1 trúng 100%
+        -- Tính năng AutoApproach đã được tắt ở cài đặt (dòng 10) nên khối code dưới sẽ bị bỏ qua
         if getgenv().AutoApproach and localHRP then
-            local offsetCFrame = targetHRP.CFrame * CFrame.new(0, 0, 3) -- Đứng sau 3 stud
+            local offsetCFrame = targetHRP.CFrame * CFrame.new(0, 0, 3) 
             localHRP.CFrame = CFrame.lookAt(offsetCFrame.Position, predictedPos)
         end
 
@@ -201,4 +201,3 @@ runService.RenderStepped:Connect(function()
         end
     end
 end)
-
