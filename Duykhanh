@@ -1,9 +1,11 @@
 getgenv().Config = { 
     FastAttack = true, 
-    AimLock = true, 
-    MaxDistAim = 90,
-    Prediction = 0.14,
-    SmoothFactor = 0.6,
+    AutoAim = true,        
+    AutoAttack = true,     
+    AntiStun = true,       
+    MaxDistAim = 200,      
+    Prediction = 0.145,
+    SmoothFactor = 0.55,
     FPSBoost = true,
     AutoFace = true,
     AutoLeaveSeat = true,
@@ -13,7 +15,7 @@ getgenv().Config = {
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LP = Players.LocalPlayer
@@ -46,49 +48,50 @@ pcall(function()
     if Shaker then Shaker:Stop() end
 end)
 
-local CachedController = nil
-local function GetCombat()
-    if CachedController then return CachedController end
-    for _, v in pairs(getreg()) do
-        if typeof(v) == "function" and getfenv(v).script and getfenv(v).script.Name == "CombatFramework" then
-            for _, v2 in pairs(debug.getupvalues(v)) do
-                if typeof(v2) == "table" and v2.activeController then
-                    CachedController = v2.activeController
-                    return CachedController
-                end
-            end
-        end
-    end
+local RigController = nil
+local function GetRigController()
+    if RigController then return RigController end
+    pcall(function()
+        RigController = require(LP.PlayerScripts:WaitForChild("CombatFramework"):WaitForChild("RigController"))
+    end)
+    return RigController
 end
 
-local lastAttack = 0
 RunService.Stepped:Connect(function()
     if getgenv().Config.FastAttack then
         pcall(function()
-            local combat = GetCombat()
+            local combat = GetRigController()
             if combat then
                 combat.timeToNextAttack = 0
                 combat.attacking = false
                 combat.hitboxMagnitude = 60
                 combat.increment = 4
-                if combat.attack and (tick() - lastAttack > 0.05) then
-                    lastAttack = tick()
-                    combat:attack()
-                end
+                combat.blocking = false
             end
         end)
     end
     
     if getgenv().Config.NoClip and LP.Character then
         for _, v in pairs(LP.Character:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.CanCollide = false
-            end
+            if v:IsA("BasePart") then v.CanCollide = false end
         end
+    end
+
+    if getgenv().Config.AntiStun and LP.Character then
+        pcall(function()
+            local hum = LP.Character:FindFirstChild("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+            end
+            for _, v in pairs(LP.Character:GetDescendants()) do
+                if v:IsA("BodyVelocity") or v:IsA("BodyPosition") or v:IsA("BodyAngularVelocity") or v:IsA("BodyGyro") then
+                    v:Destroy()
+                end
+            end
+        end)
     end
 end)
 
-local aiming = false
 local currentTarget = nil
 
 local function GetClosest()
@@ -97,9 +100,9 @@ local function GetClosest()
     if not myRoot then return nil end
     
     for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+        if plr \~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local hum = plr.Character:FindFirstChild("Humanoid")
-            if hum and hum.Health > 0 and (not plr.Team or plr.Team ~= LP.Team) then
+            if hum and hum.Health > 0 and (not plr.Team or plr.Team \~= LP.Team) then
                 local _, onScreen = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
                 if onScreen then
                     local dist = (myRoot.Position - plr.Character.HumanoidRootPart.Position).Magnitude
@@ -114,47 +117,47 @@ local function GetClosest()
     return closest
 end
 
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton2 and getgenv().Config.AimLock then
-        aiming = true
-        currentTarget = GetClosest()
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aiming = false
-        currentTarget = nil
-    end
-end)
-
 RunService.RenderStepped:Connect(function()
-    if aiming and getgenv().Config.AimLock and currentTarget then
-        local targetChar = currentTarget.Character
-        local targetHum = targetChar and targetChar:FindFirstChild("Humanoid")
-        local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+    if getgenv().Config.AutoAim then
+        currentTarget = GetClosest()
         
-        if targetHum and targetHum.Health > 0 and targetRoot then
-            local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-            local predictPos = targetRoot.Position + (targetRoot.Velocity * getgenv().Config.Prediction)
-            Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, predictPos), getgenv().Config.SmoothFactor)
-            if getgenv().Config.AutoFace and myRoot then
-                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(predictPos.X, myRoot.Position.Y, predictPos.Z))
+        if currentTarget and currentTarget.Character then
+            local targetRoot = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+            local targetHum = currentTarget.Character:FindFirstChild("Humanoid")
+            
+            if targetHum and targetHum.Health > 0 and targetRoot then
+                local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+                local predictPos = targetRoot.Position + (targetRoot.Velocity * getgenv().Config.Prediction)
+                
+                Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, predictPos), getgenv().Config.SmoothFactor)
+                
+                if getgenv().Config.AutoFace and myRoot then
+                    myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(predictPos.X, myRoot.Position.Y, predictPos.Z))
+                end
             end
-        else
-            currentTarget = GetClosest()
         end
     end
 end)
 
-local function SetupAntiSit(character)
-    local humanoid = character:WaitForChild("Humanoid", 10)
-    if humanoid then
-        humanoid:GetPropertyChangedSignal("Sit"):Connect(function()
-            if getgenv().Config.AutoLeaveSeat and humanoid.Sit then
-                humanoid.Sit = false
-                humanoid.Jump = true 
+task.spawn(function()
+    while task.wait(0.07) do
+        if getgenv().Config.AutoAttack and currentTarget then
+            pcall(function()
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                task.wait(0.01)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+            end)
+        end
+    end
+end)
+
+local function SetupAntiSit(char)
+    local hum = char:WaitForChild("Humanoid", 10)
+    if hum then
+        hum:GetPropertyChangedSignal("Sit"):Connect(function()
+            if getgenv().Config.AutoLeaveSeat and hum.Sit then
+                hum.Sit = false
+                hum.Jump = true
             end
         end)
     end
