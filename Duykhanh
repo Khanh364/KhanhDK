@@ -14,7 +14,8 @@ getgenv().Config = {
     TargetDistance = 500,
     Fly = true,
     FlySpeed = 350,
-    Camlock = true
+    Camlock = true,
+    DeleteMap = true
 }
 
 local Players = game:GetService("Players")
@@ -28,6 +29,13 @@ local CombatFramework
 pcall(function()
     CombatFramework = require(LocalPlayer.PlayerScripts.CombatFramework)
 end)
+
+local function IsEssential(obj)
+    if Players:GetPlayerFromCharacter(obj) or obj == LocalPlayer.Character then return true end
+    if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then return true end
+    if obj.Name == "WaterPlatform" or obj:IsA("Camera") or obj:IsA("Terrain") then return true end
+    return false
+end
 
 local function LowGFX(v)
     if v:IsA("BasePart") then
@@ -44,6 +52,13 @@ local function LowGFX(v)
     end
 end
 
+local function ClearMap()
+    if not getgenv().Config.DeleteMap then return end
+    for _, obj in pairs(workspace:GetChildren()) do
+        if not IsEssential(obj) then pcall(function() obj:Destroy() end) end
+    end
+end
+
 local function InitialOptimize()
     settings().Rendering.QualityLevel = 1
     lighting.GlobalShadows = false
@@ -54,19 +69,16 @@ local function InitialOptimize()
             v.Enabled = false
         end
     end
-    for _, v in pairs(workspace:GetDescendants()) do
-        LowGFX(v)
-    end
-    if workspace:FindFirstChild("Terrain") then
-        workspace.Terrain.WaterWaveSize = 0
-        workspace.Terrain.WaterWaveSpeed = 0
-        workspace.Terrain.WaterReflectance = 0
-        workspace.Terrain.WaterTransparency = 0
-    end
+    ClearMap()
+    for _, v in pairs(workspace:GetDescendants()) do LowGFX(v) end
 end
 
 workspace.ChildAdded:Connect(function(child)
     task.spawn(function()
+        if getgenv().Config.DeleteMap and not IsEssential(child) then
+            task.wait(0.1)
+            if not IsEssential(child) then child:Destroy() return end
+        end
         LowGFX(child)
         for _, v in pairs(child:GetDescendants()) do LowGFX(v) end
     end)
@@ -127,19 +139,29 @@ local function GetNearestTarget()
             end
         end
     end
+    if not target then
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Model") and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChildOfClass("Humanoid") then
+                if v.Humanoid.Health > 0 then
+                    local dist = (v.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < nearestDist then nearestDist = dist; target = v.HumanoidRootPart end
+                end
+            end
+        end
+    end
     return target
 end
 
 local waterPart = Instance.new("Part", workspace)
 waterPart.Name = "WaterPlatform"
-waterPart.Size = Vector3.new(1000, 2, 1000)
+waterPart.Size = Vector3.new(2000, 2, 2000)
 waterPart.Anchored = true
 waterPart.Transparency = 1
 
 RunService.RenderStepped:Connect(function()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
     local myHrp = LocalPlayer.Character.HumanoidRootPart
-    waterPart.Position = getgenv().Config.WalkOnWater and Vector3.new(myHrp.Position.X, 13.5, myHrp.Position.Z) or Vector3.new(0, -1000, 0)
+    waterPart.Position = Vector3.new(myHrp.Position.X, myHrp.Position.Y - 3.5, myHrp.Position.Z)
     waterPart.CanCollide = getgenv().Config.WalkOnWater
     local target = GetNearestTarget()
     if getgenv().Config.Camlock and target then
@@ -185,9 +207,7 @@ end)
 task.spawn(function()
     InitialOptimize()
     while true do
-        if getgenv().Config.FastAttack then
-            ExecuteAttack()
-        end
+        if getgenv().Config.FastAttack then ExecuteAttack() end
         if getgenv().Config.AntiSit and LocalPlayer.Character then
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false) end
