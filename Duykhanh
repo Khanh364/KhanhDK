@@ -12,6 +12,7 @@ getgenv().AntiSitEnabled = true
 getgenv().Noclip = true
 
 getgenv().AutoAimbot = true 
+getgenv().AutoApproach = true 
 getgenv().TargetRadius = 150 
 getgenv().Prediction = 0.165 
 getgenv().Smoothness = 0.5 
@@ -167,6 +168,13 @@ runService.RenderStepped:Connect(function()
         end
 
         local predictedPos = targetHRP.Position + (targetHRP.Velocity * getgenv().Prediction)
+        
+        -- Áp sát và ÉP NHÂN VẬT QUAY MẶT vào kẻ địch để M1 trúng 100%
+        if getgenv().AutoApproach and localHRP then
+            local offsetCFrame = targetHRP.CFrame * CFrame.new(0, 0, 3) -- Đứng sau 3 stud
+            localHRP.CFrame = CFrame.lookAt(offsetCFrame.Position, predictedPos)
+        end
+
         local targetCFrame = CFrame.new(camera.CFrame.Position, predictedPos)
         camera.CFrame = camera.CFrame:Lerp(targetCFrame, getgenv().Smoothness)
     end
