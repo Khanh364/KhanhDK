@@ -3,31 +3,18 @@ local runService = game:GetService("RunService")
 local workspace = game:GetService("Workspace")
 local lighting = game:GetService("Lighting")
 local terrain = workspace.Terrain
-local camera = workspace.CurrentCamera
-local virtualUser = game:GetService("VirtualUser")
 local getgenv = getgenv or function() return _G end
 
 getgenv().FastAttack = true
 getgenv().AntiSitEnabled = true
 getgenv().Noclip = true
-
-getgenv().AutoAimbot = true 
-getgenv().AutoApproach = false -- TẮT cái này để nhân vật đứng im
-getgenv().TargetRadius = 150 
-getgenv().Prediction = 0.165 
-getgenv().Smoothness = 0.5 
-
-getgenv().HitboxEnabled = true
-getgenv().HitboxSize = 80 -- TĂNG HITBOX LÊN 80 để chém xa trúng mục tiêu
-getgenv().HitboxTransparency = 0.6 
-
+getgenv().HitboxSize = 80
 getgenv().RemoveAttackEffects = true
 
 local function OptimizePerformance()
     lighting.GlobalShadows = false
     lighting.FogEnd = 9e9
     lighting.Brightness = 0
-
     for _, v in pairs(workspace:GetDescendants()) do
         if v:IsA("BasePart") then
             v.Material = Enum.Material.SmoothPlastic
@@ -36,7 +23,6 @@ local function OptimizePerformance()
             v:Destroy()
         end
     end
-
     if terrain then
         terrain.WaterWaveSize = 0
         terrain.WaterWaveSpeed = 0
@@ -60,17 +46,14 @@ workspace.DescendantAdded:Connect(RemoveVFX)
 
 local function AntiSit(character)
     local humanoid = character:WaitForChild("Humanoid", 5)
-    if humanoid then
-        if getgenv().AntiSitEnabled then
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-        end
+    if humanoid and getgenv().AntiSitEnabled then
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
     end
 end
 
 local function AntiStun(character)
     character.ChildAdded:Connect(function(child)
-        local name = child.Name:lower()
-        if name:match("stun") or name:match("frozen") or name:match("ice") then
+        if child.Name:lower():match("stun") or child.Name:lower():match("frozen") or child.Name:lower():match("ice") then
             task.wait()
             child:Destroy()
         end
@@ -90,29 +73,16 @@ end
 
 local function ExecuteCombat()
     if not player.Character or not getgenv().FastAttack then return end
-    
     local tool = player.Character:FindFirstChildOfClass("Tool")
     if tool then
-        pcall(function()
-            virtualUser:CaptureController()
-            virtualUser:ClickButton1(Vector2.new(0,0))
-        end)
-        
-        tool:Activate()
-        
-        local cooldown = tool:FindFirstChild("Cooldown") or tool:FindFirstChild("CD")
-        if cooldown and cooldown:IsA("NumberValue") then
-            cooldown.Value = 0
-        end
-        
-        local remote = tool:FindFirstChild("RemoteEvent") or tool:FindFirstChild("AttackRemote")
-        if remote and remote:IsA("RemoteEvent") then
-            remote:FireServer()
+        for _, remote in pairs(tool:GetDescendants()) do
+            if remote:IsA("RemoteEvent") then
+                remote:FireServer()
+            end
         end
     end
 end
 
-runService.RenderStepped:Connect(ExecuteCombat)
 runService.Heartbeat:Connect(ExecuteCombat)
 
 runService.Stepped:Connect(function()
@@ -125,72 +95,14 @@ runService.Stepped:Connect(function()
     end
 end)
 
-local currentTarget = nil
-
-local function GetClosestPlayerToCharacter()
-    local closestPlayer = nil
-    local shortestDistance = math.huge
-    local localChar = player.Character
-    local localHRP = localChar and localChar:FindFirstChild("HumanoidRootPart")
-
-    if not localHRP then return nil end
-
-    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local humanoid = v.Character:FindFirstChild("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                local distance = (v.Character.HumanoidRootPart.Position - localHRP.Position).Magnitude
-                if distance < shortestDistance and distance <= getgenv().TargetRadius then
-                    closestPlayer = v
-                    shortestDistance = distance
-                end
-            end
-        end
-    end
-    return closestPlayer
-end
-
 runService.RenderStepped:Connect(function()
-    if not getgenv().AutoAimbot then return end
-    
-    if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("Humanoid") or currentTarget.Character.Humanoid.Health <= 0 then
-        currentTarget = GetClosestPlayerToCharacter()
-    end
-    
-    if currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart") then
-        local localChar = player.Character
-        local localHRP = localChar and localChar:FindFirstChild("HumanoidRootPart")
-        local targetHRP = currentTarget.Character.HumanoidRootPart
-        
-        if localHRP and (targetHRP.Position - localHRP.Position).Magnitude > getgenv().TargetRadius then
-            currentTarget = nil
-            return
-        end
-
-        local predictedPos = targetHRP.Position + (targetHRP.Velocity * getgenv().Prediction)
-        
-        -- Tính năng AutoApproach đã được tắt ở cài đặt (dòng 10) nên khối code dưới sẽ bị bỏ qua
-        if getgenv().AutoApproach and localHRP then
-            local offsetCFrame = targetHRP.CFrame * CFrame.new(0, 0, 3) 
-            localHRP.CFrame = CFrame.lookAt(offsetCFrame.Position, predictedPos)
-        end
-
-        local targetCFrame = CFrame.new(camera.CFrame.Position, predictedPos)
-        camera.CFrame = camera.CFrame:Lerp(targetCFrame, getgenv().Smoothness)
-    end
-end)
-
-runService.RenderStepped:Connect(function()
-    if not getgenv().HitboxEnabled then return end
-    
     for _, v in pairs(game:GetService("Players"):GetPlayers()) do
         if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = v.Character.HumanoidRootPart
             local humanoid = v.Character:FindFirstChild("Humanoid")
-            
             if humanoid and humanoid.Health > 0 then
                 hrp.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
-                hrp.Transparency = getgenv().HitboxTransparency
+                hrp.Transparency = 0.8
                 hrp.BrickColor = BrickColor.new("Really red")
                 hrp.Material = Enum.Material.Neon
                 hrp.CanCollide = false
