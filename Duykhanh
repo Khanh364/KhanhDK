@@ -13,7 +13,7 @@ getgenv().Config = {
     AutoFace = true,
     TargetDistance = 500,
     Fly = true,
-    FlySpeed = 250,
+    FlySpeed = 350,
     Camlock = true
 }
 
@@ -29,35 +29,46 @@ pcall(function()
     CombatFramework = require(LocalPlayer.PlayerScripts.CombatFramework)
 end)
 
-local function CleanVFX(v)
-    if not getgenv().Config.RemoveEffects then return end
-    local vfxClasses = {"ParticleEmitter", "Trail", "Beam", "Fire", "Smoke", "Sparkles", "Explosion"}
-    if table.find(vfxClasses, v.ClassName) then
-        if v:IsA("ParticleEmitter") or v:IsA("Trail") then v.Enabled = false end
+local function LowGFX(v)
+    if v:IsA("BasePart") then
+        v.Material = Enum.Material.SmoothPlastic
+        v.Reflectance = 0
+        v.CastShadow = false
+    elseif v:IsA("Decal") or v:IsA("Texture") then
+        if v.Name ~= "Face" then v:Destroy() end
+    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
+        v.Enabled = false
         task.delay(0, function() v:Destroy() end)
-    elseif v:IsA("Decal") and v.Name ~= "Face" then
+    elseif v:IsA("Explosion") or v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
         v:Destroy()
     end
 end
 
 local function InitialOptimize()
+    settings().Rendering.QualityLevel = 1
     lighting.GlobalShadows = false
+    lighting.FogEnd = 9e9
     lighting.Brightness = 1
-    for _, effect in pairs(lighting:GetChildren()) do
-        if effect:IsA("PostProcessEffect") then effect.Enabled = false end
+    for _, v in pairs(lighting:GetChildren()) do
+        if v:IsA("PostProcessEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
+            v.Enabled = false
+        end
     end
     for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("BasePart") and not v:IsDescendantOf(LocalPlayer.Character) then
-            v.Material = Enum.Material.SmoothPlastic
-        end
-        CleanVFX(v)
+        LowGFX(v)
+    end
+    if workspace:FindFirstChild("Terrain") then
+        workspace.Terrain.WaterWaveSize = 0
+        workspace.Terrain.WaterWaveSpeed = 0
+        workspace.Terrain.WaterReflectance = 0
+        workspace.Terrain.WaterTransparency = 0
     end
 end
 
 workspace.ChildAdded:Connect(function(child)
     task.spawn(function()
-        CleanVFX(child)
-        for _, v in pairs(child:GetDescendants()) do CleanVFX(v) end
+        LowGFX(child)
+        for _, v in pairs(child:GetDescendants()) do LowGFX(v) end
     end)
 end)
 
@@ -101,6 +112,7 @@ local function ApplyESP(plr)
         highlight.Name = "ESPHighlight"
         highlight.FillColor = Color3.fromRGB(255, 0, 0)
         highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 1
     end
 end
 
@@ -127,16 +139,12 @@ waterPart.Transparency = 1
 RunService.RenderStepped:Connect(function()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
     local myHrp = LocalPlayer.Character.HumanoidRootPart
-    
     waterPart.Position = getgenv().Config.WalkOnWater and Vector3.new(myHrp.Position.X, 13.5, myHrp.Position.Z) or Vector3.new(0, -1000, 0)
     waterPart.CanCollide = getgenv().Config.WalkOnWater
-
     local target = GetNearestTarget()
-
     if getgenv().Config.Camlock and target then
         Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
     end
-
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = plr.Character.HumanoidRootPart
@@ -151,7 +159,6 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
-
     if getgenv().Config.AutoFace and target then
         myHrp.CFrame = CFrame.new(myHrp.Position, Vector3.new(target.Position.X, myHrp.Position.Y, target.Position.Z))
     end
@@ -160,13 +167,11 @@ end)
 RunService.Stepped:Connect(function()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
     local myHrp = LocalPlayer.Character.HumanoidRootPart
-    
     if getgenv().Config.Noclip then
         for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
             if part:IsA("BasePart") then part.CanCollide = false end
         end
     end
-
     if getgenv().Config.Fly then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         local moveDir = hum.MoveDirection
