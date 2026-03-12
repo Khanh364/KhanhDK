@@ -2,16 +2,18 @@ local player = game:GetService("Players").LocalPlayer
 local runService = game:GetService("RunService")
 local workspace = game:GetService("Workspace")
 local lighting = game:GetService("Lighting")
+local vu = game:GetService("VirtualUser")
 local terrain = workspace.Terrain
 local getgenv = getgenv or function() return _G end
 
 getgenv().FastAttack = true
-getgenv().AntiSitEnabled = true
-getgenv().Noclip = true
-getgenv().HitboxSize = 25
-getgenv().AttackSpeed = 0.0000001
-getgenv().FlySpeed = 200
+getgenv().AttackMulti = 25
+getgenv().HitboxSize = 85
+getgenv().AttackSpeed = 0
+getgenv().FlySpeed = 250
 getgenv().FlyEnabled = true
+getgenv().Noclip = true
+getgenv().AntiSitEnabled = true
 getgenv().RemoveAttackEffects = true
 
 local function OptimizePerformance()
@@ -44,7 +46,6 @@ local function RemoveVFX(child)
         pcall(function() child:Destroy() end)
     end
 end
-
 workspace.DescendantAdded:Connect(RemoveVFX)
 
 local function AntiSit(character)
@@ -81,12 +82,23 @@ task.spawn(function()
         if getgenv().FastAttack and player.Character then
             local tool = player.Character:FindFirstChildOfClass("Tool")
             if tool then
-                for _, remote in pairs(tool:GetDescendants()) do
-                    if remote:IsA("RemoteEvent") then
-                        remote:FireServer()
+                for i = 1, getgenv().AttackMulti do
+                    for _, remote in pairs(tool:GetDescendants()) do
+                        if remote:IsA("RemoteEvent") then
+                            remote:FireServer()
+                        end
                     end
                 end
             end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait() do
+        if getgenv().FastAttack then
+            vu:CaptureController()
+            vu:ClickButton1(Vector2.new(850, 450))
         end
     end
 end)
@@ -110,7 +122,7 @@ end)
 runService.Stepped:Connect(function()
     if getgenv().Noclip and player.Character then
         for _, part in pairs(player.Character:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide then
+            if part:IsA("BasePart") then
                 part.CanCollide = false
             end
         end
@@ -130,7 +142,6 @@ runService.RenderStepped:Connect(function()
                 hrp.CanCollide = false
             else
                 hrp.Size = Vector3.new(2, 2, 1)
-                hrp.Transparency = 1
             end
         end
     end
