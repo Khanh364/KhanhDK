@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Camera = workspace.CurrentCamera
 local LP = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 pcall(function()
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
@@ -16,7 +17,7 @@ Lighting.Brightness = 1
 Lighting.EnvironmentDiffuseScale = 0
 Lighting.EnvironmentSpecularScale = 0
 
-for _,v in pairs(Lighting:GetChildren()) do
+for _, v in pairs(Lighting:GetChildren()) do
     if v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("DepthOfFieldEffect") then
         v.Enabled = false
     end
@@ -27,7 +28,7 @@ if Terrain then
     Terrain.WaterWaveSpeed = 0
     Terrain.WaterReflectance = 0
     Terrain.WaterTransparency = 1
-    pcall(function() sethiddenproperty(Terrain,"Decoration",false) end)
+    pcall(function() sethiddenproperty(Terrain, "Decoration", false) end)
 end
 
 local function Optimize(v)
@@ -43,11 +44,11 @@ local function Optimize(v)
     end
 end
 
-for _,v in pairs(game:GetDescendants()) do Optimize(v) end
+for _, v in pairs(game:GetDescendants()) do Optimize(v) end
 game.DescendantAdded:Connect(Optimize)
 
 local function RemoveAccessories(char)
-    for _,v in pairs(char:GetChildren()) do
+    for _, v in pairs(char:GetChildren()) do
         if v:IsA("Accessory") then v:Destroy() end
     end
 end
@@ -61,56 +62,83 @@ workspace.StreamingTargetRadius = 64
 pcall(function() settings().Physics.AllowSleep = true end)
 
 getgenv().Config = { 
-    FastAttack = true, 
+    FastFruitM1 = true,        
     AutoAim = true,        
-    AutoAttack = true,     
-    AutoClick = true,      
     AntiStun = true,       
     MaxDistAim = 200,      
     Prediction = 0.145,
     SmoothFactor = 0.55,
-    FPSBoost = true,
     AutoFace = true,
     AutoLeaveSeat = true,
     AutoHaki = true,
-    NoClip = true
+    NoClip = true,
+    
+    AutoServerHop = {
+        Enable = true,
+        MinPlayers = 5,         
+        CheckInterval = 30,
+        HopDelay = 3,
+        RetryIfFail = true
+    }
 }
 
--- ==================== FAST ATTACK MỚI NHẤT 2026 ====================
+local CombatFramework = nil
+pcall(function()
+    CombatFramework = require(LP.PlayerScripts:WaitForChild("CombatFramework", 9))
+end)
+
 local function GetActiveController()
-    pcall(function()
-        return require(LP.PlayerScripts:WaitForChild("CombatFramework")).activeController
-    end)
+    return CombatFramework and CombatFramework.activeController
 end
 
-RunService.Stepped:Connect(function()
-    -- FAST ATTACK (Control Rework fix)
-    if getgenv().Config.FastAttack then
-        pcall(function()
-            local ac = GetActiveController()
-            if ac then
-                ac.timeToNextAttack = -(math.huge ^ math.huge ^ math.huge)
-                ac.attacking = false
-                ac.hitboxMagnitude = 60
-                ac.increment = 4
-                ac.blocking = false
-            end
-        end)
-    end
+RunService.Heartbeat:Connect(function()
+    if not getgenv().Config.FastFruitM1 then return end
+    
+    pcall(function()
+        local ac = GetActiveController()
+        if ac then
+            ac.timeToNextAttack = 0          
+            ac.attacking = false
+            ac.blocking = false
+            ac.hitboxMagnitude = 80          
+            ac.increment = 4 + math.random() * 0.5  
 
-    -- NoClip
+            if ac.anims and ac.anims.basic then
+                for _, anim in pairs(ac.anims.basic) do
+                    if anim and anim.IsPlaying == false then
+                        anim:Play(0.001, 1, 120)  
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+task.spawn(function()
+    while true do
+        if getgenv().Config.FastFruitM1 and LP.Character and LP.Character:FindFirstChild("Humanoid") and LP.Character.Humanoid.Health > 0 then
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)   
+            task.wait(0.001)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)  
+            task.wait(0.001)
+        else
+            task.wait(0.1)
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
     if getgenv().Config.NoClip and LP.Character then
-        for _,v in pairs(LP.Character:GetDescendants()) do
+        for _, v in pairs(LP.Character:GetDescendants()) do
             if v:IsA("BasePart") then v.CanCollide = false end
         end
     end
 
-    -- AntiStun
     if getgenv().Config.AntiStun and LP.Character then
         pcall(function()
             local hum = LP.Character:FindFirstChild("Humanoid")
             if hum then hum.PlatformStand = false end
-            for _,v in pairs(LP.Character:GetDescendants()) do
+            for _, v in pairs(LP.Character:GetDescendants()) do
                 if v:IsA("BodyVelocity") or v:IsA("BodyPosition") or v:IsA("BodyAngularVelocity") or v:IsA("BodyGyro") then
                     v:Destroy()
                 end
@@ -159,28 +187,8 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-task.spawn(function()
-    while task.wait(0.07) do
-        if getgenv().Config.AutoAttack then
-            VirtualInputManager:SendMouseButtonEvent(0,0,0,true,game,1)
-            task.wait(0.01)
-            VirtualInputManager:SendMouseButtonEvent(0,0,0,false,game,1)
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.05) do
-        if getgenv().Config.AutoClick then
-            VirtualInputManager:SendMouseButtonEvent(0,0,0,true,game,1)
-            task.wait(0.015)
-            VirtualInputManager:SendMouseButtonEvent(0,0,0,false,game,1)
-        end
-    end
-end)
-
 local function SetupAntiSit(char)
-    local hum = char:WaitForChild("Humanoid",10)
+    local hum = char:WaitForChild("Humanoid", 10)
     if hum then
         hum:GetPropertyChangedSignal("Sit"):Connect(function()
             if getgenv().Config.AutoLeaveSeat and hum.Sit then
@@ -200,7 +208,7 @@ task.spawn(function()
             pcall(function()
                 local char = LP.Character
                 if char and not char:FindFirstChild("HasBuso") then
-                    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Buso")
+                    ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso")
                 end
             end)
         end
@@ -211,7 +219,40 @@ task.spawn(function()
     while task.wait(60) do
         pcall(function()
             game:GetService("VirtualUser"):CaptureController()
-            game:GetService("VirtualUser"):ClickButton1(Vector2.new(0,0))
+            game:GetService("VirtualUser"):ClickButton1(Vector2.new())
         end)
     end
 end)
+
+local hopCfg = getgenv().Config.AutoServerHop
+
+if hopCfg.Enable then
+    task.spawn(function()
+        local TS = game:GetService("TeleportService")
+        
+        while true do
+            task.wait(hopCfg.CheckInterval)
+            
+            if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then continue end
+            
+            local playerCount = #Players:GetPlayers() - 1
+            
+            if playerCount < hopCfg.MinPlayers then
+                ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Auto hopping server vắng...", "All")
+                
+                task.wait(hopCfg.HopDelay)
+                
+                playerCount = #Players:GetPlayers() - 1
+                if playerCount < hopCfg.MinPlayers then
+                    local success, err = pcall(function()
+                        TS:Teleport(game.PlaceId, LP)
+                    end)
+                    
+                    if not success then
+                        if hopCfg.RetryIfFail then task.wait(5) end
+                    end
+                end
+            end
+        end
+    end)
+end
