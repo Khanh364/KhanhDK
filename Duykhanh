@@ -1,199 +1,142 @@
-local player = game:GetService("Players").LocalPlayer
-local runService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 local workspace = game:GetService("Workspace")
 local lighting = game:GetService("Lighting")
-local terrain = workspace.Terrain
-local getgenv = getgenv or function() return _G end
 
-getgenv().FastAttack = true
-getgenv().AntiSitEnabled = true
-getgenv().Noclip = true
-getgenv().HitboxSize = 50
-getgenv().AttackSpeed = 0
-getgenv().FlySpeed = 350
-getgenv().FlyEnabled = true
-getgenv().RemoveAttackEffects = true
-getgenv().PlayerESP = true
-getgenv().WalkOnWater = true
-getgenv().AimbotSkills = true
+getgenv().Config = {
+    FastAttack = true,
+    AttackSpeed = 0.1,
+    HitboxSize = 50,
+    HitboxTransparency = 0.8,
+    PlayerESP = true,
+    Noclip = true,
+    AntiSit = true,
+    WalkOnWater = true,
+    RemoveEffects = true,
+    AutoFace = true
+}
 
-local function OptimizePerformance()
+local CombatFramework
+pcall(function()
+    CombatFramework = require(LocalPlayer.PlayerScripts.CombatFramework)
+end)
+
+local function GetCurrentController()
+    if CombatFramework then
+        return CombatFramework.activeController
+    end
+    return nil
+end
+
+local function Attack()
+    local controller = GetCurrentController()
+    if controller and controller.equipped then
+        pcall(function()
+            controller:attack() 
+        end)
+    end
+end
+
+local function Optimize()
     lighting.GlobalShadows = false
-    lighting.FogEnd = 9e9
     lighting.Brightness = 1
     for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("BasePart") and not v:IsDescendantOf(player.Character) then
+        if v:IsA("BasePart") and not v:IsDescendantOf(LocalPlayer.Character) then
             v.Material = Enum.Material.SmoothPlastic
-            v.Reflectance = 0
-        elseif v:IsA("Decal") or v:IsA("Texture") or v:IsA("ParticleEmitter") or v:IsA("Trail") then
-            v:Destroy()
+        elseif v:IsA("Decal") or v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            if getgenv().Config.RemoveEffects then v:Destroy() end
         end
     end
-    if terrain then
-        terrain.WaterWaveSize = 0
-        terrain.WaterWaveSpeed = 0
-        terrain.WaterReflectance = 0
-        terrain.WaterTransparency = 0
-    end
 end
-OptimizePerformance()
+Optimize()
 
-local function RemoveVFX(child)
-    if not getgenv().RemoveAttackEffects then return end
-    task.wait()
-    if child:IsA("ParticleEmitter") or child:IsA("Trail") or child:IsA("Beam") or child:IsA("Explosion") or child:IsA("Fire") or child:IsA("Smoke") or child:IsA("Sparkles") then
-        pcall(function() child:Destroy() end)
-    elseif child:IsA("BasePart") and (child.Name:lower():match("effect") or child.Name:lower():match("slash") or child.Name:lower():match("magic")) then
-        pcall(function() child:Destroy() end)
-    end
-end
-workspace.DescendantAdded:Connect(RemoveVFX)
-
-local function AntiSit(character)
-    local humanoid = character:WaitForChild("Humanoid", 5)
-    if humanoid and getgenv().AntiSitEnabled then
-        humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+local function ApplyESP(plr)
+    if plr ~= LocalPlayer and plr.Character and not plr.Character:FindFirstChild("ESPHighlight") then
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "ESPHighlight"
+        highlight.Parent = plr.Character
+        highlight.FillColor = Color3.new(1, 0, 0)
+        highlight.FillTransparency = 0.5
     end
 end
 
-local function AntiStun(character)
-    character.ChildAdded:Connect(function(child)
-        local name = child.Name:lower()
-        if name:match("stun") or name:match("frozen") or name:match("ice") then
-            task.wait()
-            child:Destroy()
+local function GetNearestTarget()
+    local target = nil
+    local dist = 500
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character.Humanoid.Health > 0 then
+            local d = (v.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if d < dist then
+                dist = d
+                target = v.Character.HumanoidRootPart
+            end
         end
-    end)
-    character.DescendantAdded:Connect(RemoveVFX)
-end
-
-player.CharacterAdded:Connect(function(character)
-    AntiSit(character)
-    AntiStun(character)
-end)
-
-if player.Character then
-    AntiSit(player.Character)
-    AntiStun(player.Character)
-end
-
-local waterPlatform = Instance.new("Part")
-waterPlatform.Size = Vector3.new(100, 5, 100)
-waterPlatform.Transparency = 1
-waterPlatform.Anchored = true
-waterPlatform.CanCollide = true
-waterPlatform.Parent = workspace
-
-runService.RenderStepped:Connect(function()
-    if getgenv().WalkOnWater and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = player.Character.HumanoidRootPart
-        waterPlatform.Position = Vector3.new(hrp.Position.X, 13.5, hrp.Position.Z)
-    else
-        waterPlatform.Position = Vector3.new(0, -9999, 0)
     end
-end)
+    return target
+end
 
-runService.Heartbeat:Connect(function()
-    if getgenv().FastAttack and player.Character then
-        local tool = player.Character:FindFirstChildOfClass("Tool")
-        if tool then
-            for _, remote in pairs(tool:GetDescendants()) do
-                if remote:IsA("RemoteEvent") then
-                    remote:FireServer()
+local waterPart = Instance.new("Part")
+waterPart.Size = Vector3.new(100, 5, 100)
+waterPart.Anchored = true
+waterPart.Transparency = 1
+waterPart.Parent = workspace
+
+RunService.RenderStepped:Connect(function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local myHrp = LocalPlayer.Character.HumanoidRootPart
+        
+        -- Walk on Water
+        if getgenv().Config.WalkOnWater then
+            waterPart.Position = Vector3.new(myHrp.Position.X, 13.5, myHrp.Position.Z)
+        else
+            waterPart.Position = Vector3.new(0, -999, 0)
+        end
+
+        -- Hitbox & ESP
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = plr.Character.HumanoidRootPart
+                if plr.Character.Humanoid.Health > 0 then
+                    hrp.Size = Vector3.new(getgenv().Config.HitboxSize, getgenv().Config.HitboxSize, getgenv().Config.HitboxSize)
+                    hrp.Transparency = getgenv().Config.HitboxTransparency
+                    hrp.BrickColor = BrickColor.new("Really red")
+                    hrp.Material = Enum.Material.Neon
+                    hrp.CanCollide = false
+                    if getgenv().Config.PlayerESP then ApplyESP(plr) end
+                else
+                    hrp.Size = Vector3.new(2, 2, 1)
+                    hrp.Transparency = 1
                 end
             end
         end
-    end
-    
-    if getgenv().AimbotSkills and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local nearest = nil
-        local dist = math.huge
-        for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-            if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") then
-                if v.Character.Humanoid.Health > 0 then
-                    local d = (v.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                    if d < dist then
-                        dist = d
-                        nearest = v.Character.HumanoidRootPart
-                    end
-                end
-            end
-        end
-        if nearest and dist < 500 then
-            local hrp = player.Character.HumanoidRootPart
-            hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(nearest.Position.X, hrp.Position.Y, nearest.Position.Z))
-        end
-    end
-end)
 
-runService.Heartbeat:Connect(function()
-    if getgenv().FlyEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = player.Character.HumanoidRootPart
-        local humanoid = player.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            local moveDir = humanoid.MoveDirection
-            if moveDir.Magnitude > 0 then
-                hrp.Velocity = moveDir * getgenv().FlySpeed + Vector3.new(0, 2, 0)
-            else
-                hrp.Velocity = Vector3.new(0, 1.5, 0)
+        -- Auto Face
+        if getgenv().Config.AutoFace then
+            local target = GetNearestTarget()
+            if target then
+                myHrp.CFrame = CFrame.new(myHrp.Position, Vector3.new(target.Position.X, myHrp.Position.Y, target.Position.Z))
             end
         end
     end
 end)
 
-runService.Stepped:Connect(function()
-    if getgenv().Noclip and player.Character then
-        for _, part in pairs(player.Character:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide then
-                part.CanCollide = false
-            end
+RunService.Stepped:Connect(function()
+    if getgenv().Config.Noclip and LocalPlayer.Character then
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
         end
     end
 end)
 
-runService.RenderStepped:Connect(function()
-    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = v.Character.HumanoidRootPart
-            local humanoid = v.Character:FindFirstChild("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                hrp.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
-                hrp.Transparency = 0.9
-                hrp.BrickColor = BrickColor.new("White")
-                hrp.Material = Enum.Material.Neon
-                hrp.CanCollide = false
-            else
-                hrp.Size = Vector3.new(2, 2, 1)
-                hrp.Transparency = 1
-            end
+task.spawn(function()
+    while true do
+        if getgenv().Config.FastAttack then
+            Attack()
         end
-    end
-end)
-
-local function applyESP(plr)
-    if plr ~= player and getgenv().PlayerESP and plr.Character then
-        if not plr.Character:FindFirstChild("ESPHighlight") then
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "ESPHighlight"
-            highlight.Parent = plr.Character
-            highlight.FillColor = Color3.new(1, 0, 0)
-            highlight.OutlineColor = Color3.new(1, 1, 1)
-            highlight.FillTransparency = 0.5
+        if getgenv().Config.AntiSit and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
         end
-    end
-end
-
-game:GetService("Players").PlayerAdded:Connect(function(plr)
-    plr.CharacterAdded:Connect(function()
-        task.wait(1)
-        applyESP(plr)
-    end)
-end)
-
-runService.RenderStepped:Connect(function()
-    if getgenv().PlayerESP then
-        for _, plr in pairs(game:GetService("Players"):GetPlayers()) do
-            applyESP(plr)
-        end
+        task.wait(getgenv().Config.AttackSpeed)
     end
 end)
