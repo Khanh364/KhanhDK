@@ -1,6 +1,40 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ScriptContext = game:GetService("ScriptContext")
+local VirtualUser = game:GetService("VirtualUser")
+
+pcall(function()
+    LocalPlayer.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+
+    for _, connection in pairs(getconnections(ScriptContext.Error)) do
+        connection:Disable()
+    end
+
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    setreadonly(mt, false)
+
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" or method == "kick" then return nil end
+
+        if method == "FireServer" or method == "InvokeServer" then
+            local remoteName = tostring(self):lower()
+            if remoteName:find("ban") or remoteName:find("kick") or remoteName:find("report") 
+            or remoteName:find("anticheat") or remoteName:find("log") or remoteName:find("detect") then
+                return nil 
+            end
+        end
+        return oldNamecall(self, ...)
+    end)
+    setreadonly(mt, true)
+end)
+
 getgenv().Config = {
     FastAttack = true,
-    AttackRepeat = 10,
     NoAnimation = true,
     NoCooldown = true,
     HitboxSize = 50,
@@ -9,7 +43,6 @@ getgenv().Config = {
     Noclip = true,
     AntiSit = true,
     WalkOnWater = true,
-    RemoveEffects = true,
     AutoFace = true,
     TargetDistance = 1000,
     Fly = true,
@@ -20,18 +53,17 @@ getgenv().Config = {
     ServerHopOnAdmin = true,
     LowPlayerServer = true,
     SafeMagnitude = 45,
-    RandomizeDelay = true,
     HideVelocity = true,
     Prediction = true,
     PredictionIntensity = 0.15,
     TeleportToTarget = false,
     TpOffset = Vector3.new(0, 5, 2),
     AutoHopWhenNoTargets = true,
-    InfEnergy = true
+    InfEnergy = true,
+    RemoveGameEffects = true, 
+    HideName = true           
 }
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local workspace = game:GetService("Workspace")
 local lighting = game:GetService("Lighting")
@@ -40,15 +72,26 @@ local HttpService = game:GetService("HttpService")
 local Camera = workspace.CurrentCamera
 
 local CombatFramework
-pcall(function()
-    CombatFramework = require(LocalPlayer.PlayerScripts.CombatFramework)
-end)
+pcall(function() CombatFramework = require(LocalPlayer.PlayerScripts.CombatFramework) end)
 
 local function IsEssential(obj)
     if Players:GetPlayerFromCharacter(obj) or obj == LocalPlayer.Character then return true end
     if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then return true end
     if obj.Name == "WaterPlatform" or obj:IsA("Camera") or obj:IsA("Terrain") then return true end
     return false
+end
+
+local function ClearCombatEffects()
+    if not getgenv().Config.RemoveGameEffects then return end
+    for _, name in pairs({"Effects", "Effect", "fx", "HitEffects", "Projectiles"}) do
+        local folder = workspace:FindFirstChild(name)
+        if folder then
+            folder:ClearAllChildren()
+            folder.ChildAdded:Connect(function(child)
+                task.delay(0, function() pcall(function() child:Destroy() end) end)
+            end)
+        end
+    end
 end
 
 local function LowGFX(v)
@@ -84,19 +127,17 @@ local function InitialOptimize()
         end
     end
     ClearMap()
+    ClearCombatEffects()
     for _, v in pairs(workspace:GetDescendants()) do LowGFX(v) end
 end
 
 local function ServerHop()
     local PlaceID = game.PlaceId
     local JobID = game.JobId
-    local API = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"
     local function GetServers(cursor)
-        local url = API .. (cursor and "&cursor=" .. cursor or "")
-        local success, result = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet(url))
-        end)
-        return success and result or nil
+        local url = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100" .. (cursor and "&cursor=" .. cursor or "")
+        local s, r = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
+        return s and r or nil
     end
     task.spawn(function()
         local cursor = nil
@@ -120,18 +161,11 @@ end
 local function CheckAdmin(player)
     if not getgenv().Config.AntiAdmin then return end
     local isStaff = false
-    pcall(function()
-        if player:GetRankInGroup(game.CreatorId) >= 200 or player:GetRankInGroup(4442245) >= 200 then
-            isStaff = true
-        end
-    end)
-    local adminNames = {"admin", "mod", "staff", "owner", "tester"}
-    for _, name in pairs(adminNames) do
+    pcall(function() if player:GetRankInGroup(game.CreatorId) >= 200 or player:GetRankInGroup(4442245) >= 200 then isStaff = true end end)
+    for _, name in pairs({"admin", "mod", "staff", "owner", "tester"}) do
         if string.find(player.Name:lower(), name) then isStaff = true end
     end
-    if isStaff then
-        if getgenv().Config.ServerHopOnAdmin then ServerHop() else LocalPlayer:Kick("Admin Detected") end
-    end
+    if isStaff then if getgenv().Config.ServerHopOnAdmin then ServerHop() else LocalPlayer:Kick("Admin Detected") end end
 end
 
 local function GetNearestTarget()
@@ -166,30 +200,24 @@ local function ExecuteAttack()
     local controller
     pcall(function() controller = CombatFramework.activeController end)
     if controller and controller.equipped then
-        local count = 0
-        local repeatCount = getgenv().Config.AttackRepeat
-        if getgenv().Config.RandomizeDelay then repeatCount = math.random(repeatCount - 3, repeatCount + 2) end
-        repeat
-            if getgenv().Config.NoCooldown then
-                controller.attackInterval = 0 
-                controller.timeToNextAttack = 0
-                controller.hitboxCreated = false
-            end
-            pcall(function() controller:attack() end)
-            count = count + 1
-            if getgenv().Config.RandomizeDelay then task.wait(math.random(1, 5) / 100) end
-        until count >= repeatCount
+        if getgenv().Config.NoCooldown then
+            controller.attackInterval = 0 
+            controller.timeToNextAttack = 0
+            controller.hitboxCreated = false
+        end
+        pcall(function() controller:attack() end)
     end
 end
 
 local function ApplyESP(plr)
     if not getgenv().Config.PlayerESP then return end
     if plr ~= LocalPlayer and plr.Character and not plr.Character:FindFirstChild("ESPHighlight") then
-        local highlight = Instance.new("Highlight", plr.Character)
+        local highlight = Instance.new("Highlight")
         highlight.Name = "ESPHighlight"
         highlight.FillColor = Color3.fromRGB(255, 0, 0)
         highlight.FillTransparency = 0.5
         highlight.OutlineTransparency = 1
+        highlight.Parent = plr.Character
     end
 end
 
@@ -197,16 +225,31 @@ local function SetupCharacter(char)
     local humanoid = char:WaitForChild("Humanoid", 5)
     if not humanoid then return end
     
+    if getgenv().Config.HideName then
+        task.spawn(function()
+            task.wait(1)
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BillboardGui") or v:IsA("TextLabel") or v:IsA("SurfaceGui") then
+                    if v.Name == "NameTag" or v.Name == "Title" or (v:IsA("TextLabel") and v.Text:find(LocalPlayer.Name)) then
+                        v:Destroy()
+                    end
+                end
+            end
+        end)
+    end
+
     if getgenv().Config.AntiSit then
         humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
     end
     
     humanoid.AnimationPlayed:Connect(function(track)
         if getgenv().Config.NoAnimation then
-            local animName = track.Name:lower()
-            if animName:find("attack") or animName:find("slash") or animName:find("swing") or animName:find("hit") then
-                track:Stop()
-            end
+            pcall(function()
+                local animName = track.Name:lower()
+                if animName:find("attack") or animName:find("slash") or animName:find("swing") or animName:find("hit") then
+                    track:Stop()
+                end
+            end)
         end
     end)
 end
@@ -217,6 +260,13 @@ workspace.ChildAdded:Connect(function(child)
             task.wait(0.1)
             if not IsEssential(child) then child:Destroy() return end
         end
+        if getgenv().Config.RemoveGameEffects and (child:IsA("Part") or child:IsA("MeshPart")) and not IsEssential(child) then
+            local name = child.Name:lower()
+            if name:find("slash") or name:find("hit") or name:find("effect") or name:find("ring") or name:find("magic") then
+                task.delay(0, function() pcall(function() child:Destroy() end) end)
+                return
+            end
+        end
         LowGFX(child)
         for _, v in pairs(child:GetDescendants()) do LowGFX(v) end
     end)
@@ -225,23 +275,44 @@ end)
 LocalPlayer.CharacterAdded:Connect(SetupCharacter)
 if LocalPlayer.Character then SetupCharacter(LocalPlayer.Character) end
 
-local waterPart = Instance.new("Part", workspace)
+local waterPart = Instance.new("Part")
 waterPart.Name = "WaterPlatform"
 waterPart.Size = Vector3.new(2000, 2, 2000)
 waterPart.Anchored = true
 waterPart.Transparency = 1
+waterPart.Parent = workspace
+
+task.spawn(function()
+    while task.wait(0.5) do
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = plr.Character.HumanoidRootPart
+                local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    hrp.Size = Vector3.new(getgenv().Config.HitboxSize, getgenv().Config.HitboxSize, getgenv().Config.HitboxSize)
+                    hrp.Transparency = getgenv().Config.HitboxTransparency
+                    hrp.CanCollide = false
+                    if getgenv().Config.PlayerESP then ApplyESP(plr) end
+                else
+                    hrp.Size = Vector3.new(2, 2, 1)
+                end
+            end
+        end
+    end
+end)
 
 RunService.RenderStepped:Connect(function()
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
     local myHrp = LocalPlayer.Character.HumanoidRootPart
+    
     waterPart.Position = Vector3.new(myHrp.Position.X, myHrp.Position.Y - 3.5, myHrp.Position.Z)
-    waterPart.CanCollide = getgenv().Config.WalkOnWater
+    waterPart.CanCollide = getgenv().Config.WalkOnWater and not getgenv().Config.Fly 
     
     local target = GetNearestTarget()
     if target then
         local targetPos = target.Position
         if getgenv().Config.Prediction then
-            targetPos = targetPos + (target.Velocity * getgenv().Config.PredictionIntensity)
+            targetPos = targetPos + (target.AssemblyLinearVelocity * getgenv().Config.PredictionIntensity)
         end
         if getgenv().Config.Camlock then
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
@@ -256,21 +327,6 @@ RunService.RenderStepped:Connect(function()
 
     if getgenv().Config.InfEnergy and LocalPlayer.Character:FindFirstChild("Energy") then
         LocalPlayer.Character.Energy.Value = LocalPlayer.Character.Energy.MaxValue
-    end
-
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = plr.Character.HumanoidRootPart
-            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                hrp.Size = Vector3.new(getgenv().Config.HitboxSize, getgenv().Config.HitboxSize, getgenv().Config.HitboxSize)
-                hrp.Transparency = getgenv().Config.HitboxTransparency
-                hrp.CanCollide = false
-                if getgenv().Config.PlayerESP then ApplyESP(plr) end
-            else
-                hrp.Size = Vector3.new(2, 2, 1)
-            end
-        end
     end
 end)
 
@@ -288,7 +344,7 @@ RunService.Stepped:Connect(function()
         if moveDir.Magnitude > 0 then
             myHrp.CFrame = myHrp.CFrame + (moveDir * (getgenv().Config.FlySpeed / 50))
         end
-        myHrp.Velocity = getgenv().Config.HideVelocity and Vector3.new(0, 1.1, 0) or Vector3.zero
+        myHrp.AssemblyLinearVelocity = getgenv().Config.HideVelocity and Vector3.new(0, 1.1, 0) or Vector3.zero
     end
 end)
 
