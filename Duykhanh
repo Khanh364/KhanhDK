@@ -8,11 +8,14 @@ local getgenv = getgenv or function() return _G end
 getgenv().FastAttack = true
 getgenv().AntiSitEnabled = true
 getgenv().Noclip = true
-getgenv().HitboxSize = 25
-getgenv().AttackSpeed = 0.0000001
+getgenv().HitboxSize = 50
+getgenv().AttackSpeed = 0
 getgenv().FlySpeed = 350
 getgenv().FlyEnabled = true
 getgenv().RemoveAttackEffects = true
+getgenv().PlayerESP = true
+getgenv().WalkOnWater = true
+getgenv().AimbotSkills = true
 
 local function OptimizePerformance()
     lighting.GlobalShadows = false
@@ -44,7 +47,6 @@ local function RemoveVFX(child)
         pcall(function() child:Destroy() end)
     end
 end
-
 workspace.DescendantAdded:Connect(RemoveVFX)
 
 local function AntiSit(character)
@@ -75,28 +77,60 @@ if player.Character then
     AntiStun(player.Character)
 end
 
-task.spawn(function()
-    while true do
-        task.wait(getgenv().AttackSpeed)
-        if getgenv().FastAttack and player.Character then
-            local tool = player.Character:FindFirstChildOfClass("Tool")
-            if tool then
-                for _, remote in pairs(tool:GetDescendants()) do
-                    if remote:IsA("RemoteEvent") then
-                        remote:FireServer()
-                    end
+local waterPlatform = Instance.new("Part")
+waterPlatform.Size = Vector3.new(100, 5, 100)
+waterPlatform.Transparency = 1
+waterPlatform.Anchored = true
+waterPlatform.CanCollide = true
+waterPlatform.Parent = workspace
+
+runService.RenderStepped:Connect(function()
+    if getgenv().WalkOnWater and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = player.Character.HumanoidRootPart
+        waterPlatform.Position = Vector3.new(hrp.Position.X, 13.5, hrp.Position.Z)
+    else
+        waterPlatform.Position = Vector3.new(0, -9999, 0)
+    end
+end)
+
+runService.Heartbeat:Connect(function()
+    if getgenv().FastAttack and player.Character then
+        local tool = player.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            for _, remote in pairs(tool:GetDescendants()) do
+                if remote:IsA("RemoteEvent") then
+                    remote:FireServer()
                 end
             end
         end
     end
+    
+    if getgenv().AimbotSkills and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local nearest = nil
+        local dist = math.huge
+        for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+            if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") then
+                if v.Character.Humanoid.Health > 0 then
+                    local d = (v.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                    if d < dist then
+                        dist = d
+                        nearest = v.Character.HumanoidRootPart
+                    end
+                end
+            end
+        end
+        if nearest and dist < 500 then
+            local hrp = player.Character.HumanoidRootPart
+            hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(nearest.Position.X, hrp.Position.Y, nearest.Position.Z))
+        end
+    end
 end)
 
-task.spawn(function()
-    while true do
-        task.wait()
-        if getgenv().FlyEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = player.Character.HumanoidRootPart
-            local humanoid = player.Character:FindFirstChild("Humanoid")
+runService.Heartbeat:Connect(function()
+    if getgenv().FlyEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = player.Character.HumanoidRootPart
+        local humanoid = player.Character:FindFirstChild("Humanoid")
+        if humanoid then
             local moveDir = humanoid.MoveDirection
             if moveDir.Magnitude > 0 then
                 hrp.Velocity = moveDir * getgenv().FlySpeed + Vector3.new(0, 2, 0)
@@ -132,6 +166,34 @@ runService.RenderStepped:Connect(function()
                 hrp.Size = Vector3.new(2, 2, 1)
                 hrp.Transparency = 1
             end
+        end
+    end
+end)
+
+local function applyESP(plr)
+    if plr ~= player and getgenv().PlayerESP and plr.Character then
+        if not plr.Character:FindFirstChild("ESPHighlight") then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "ESPHighlight"
+            highlight.Parent = plr.Character
+            highlight.FillColor = Color3.new(1, 0, 0)
+            highlight.OutlineColor = Color3.new(1, 1, 1)
+            highlight.FillTransparency = 0.5
+        end
+    end
+end
+
+game:GetService("Players").PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function()
+        task.wait(1)
+        applyESP(plr)
+    end)
+end)
+
+runService.RenderStepped:Connect(function()
+    if getgenv().PlayerESP then
+        for _, plr in pairs(game:GetService("Players"):GetPlayers()) do
+            applyESP(plr)
         end
     end
 end)
