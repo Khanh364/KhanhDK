@@ -14,6 +14,18 @@ getgenv().Config = {
     NoClip = true
 }
 
+getgenv().AntiSus = {
+    Enable = true,
+    ClickDelayMin = 0.04,
+    ClickDelayMax = 0.20,
+    PauseChance = 0.22,
+    PauseMin = 0.18,
+    PauseMax = 0.65,
+    JitterAmount = 1.2,
+    StopLowHP = true,
+    LowHPThreshold = 1200
+}
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -199,3 +211,50 @@ task.spawn(function()
         end)
     end
 end)
+
+if getgenv().AntiSus.Enable then
+    local VIM = game:GetService("VirtualInputManager")
+    
+    local oldSendMouse = VIM.SendMouseButtonEvent
+    VIM.SendMouseButtonEvent = newcclosure(function(x, y, button, down, window, ...)
+        if down and button == 0 and getgenv().AntiSus.Enable then
+            task.wait(math.random() * (getgenv().AntiSus.ClickDelayMax - getgenv().AntiSus.ClickDelayMin) + getgenv().AntiSus.ClickDelayMin)
+            
+            if math.random() < getgenv().AntiSus.PauseChance then
+                task.wait(math.random() * (getgenv().AntiSus.PauseMax - getgenv().AntiSus.PauseMin) + getgenv().AntiSus.PauseMin)
+            end
+        end
+        return oldSendMouse(x, y, button, down, window, ...)
+    end)
+
+    RunService.RenderStepped:Connect(function(dt)
+        if not getgenv().AntiSus.Enable or not currentTarget or not currentTarget.Character then return end
+        
+        local targetHum = currentTarget.Character:FindFirstChild("Humanoid")
+        local targetRoot = currentTarget.Character:FindFirstChild("HumanoidRootPart")
+        
+        if targetHum and targetRoot then
+            if targetHum.Health <= 0 or (getgenv().AntiSus.StopLowHP and targetHum.Health < getgenv().AntiSus.LowHPThreshold) then
+                currentTarget = nil
+                return
+            end
+            
+            local jitter = Vector3.new(
+                math.random(-getgenv().AntiSus.JitterAmount, getgenv().AntiSus.JitterAmount),
+                math.random(-getgenv().AntiSus.JitterAmount * 0.5, getgenv().AntiSus.JitterAmount * 0.5),
+                math.random(-getgenv().AntiSus.JitterAmount, getgenv().AntiSus.JitterAmount)
+            )
+            
+            local predictPos = targetRoot.Position + (targetRoot.Velocity * getgenv().Config.Prediction) + jitter * 0.08
+            
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, predictPos), getgenv().Config.SmoothFactor * 0.92)
+            
+            if getgenv().Config.AutoFace and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                local myRoot = LP.Character.HumanoidRootPart
+                myRoot.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(predictPos.X, myRoot.Position.Y, predictPos.Z))
+            end
+        end
+    end)
+end
+
+print("Script loaded - Combat + Anti Sus Kill ready!")
