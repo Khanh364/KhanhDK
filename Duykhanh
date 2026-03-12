@@ -1,6 +1,6 @@
 getgenv().Config = {
     FastAttack = true,
-    AttackRepeat = 15,
+    AttackRepeat = 10,
     NoAnimation = true,
     NoCooldown = true,
     HitboxSize = 50,
@@ -15,7 +15,17 @@ getgenv().Config = {
     Fly = true,
     FlySpeed = 350,
     Camlock = true,
-    DeleteMap = true
+    DeleteMap = true,
+    AntiAdmin = true,
+    ServerHopOnAdmin = true,
+    LowPlayerServer = true,
+    SafeMagnitude = 45,
+    RandomizeDelay = true,
+    HideVelocity = true,
+    Prediction = true,
+    PredictionIntensity = 0.15,
+    TeleportToTarget = false,
+    TpOffset = Vector3.new(0, 5, 2)
 }
 
 local Players = game:GetService("Players")
@@ -23,6 +33,8 @@ local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local workspace = game:GetService("Workspace")
 local lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local Camera = workspace.CurrentCamera
 
 local CombatFramework
@@ -73,58 +85,52 @@ local function InitialOptimize()
     for _, v in pairs(workspace:GetDescendants()) do LowGFX(v) end
 end
 
-workspace.ChildAdded:Connect(function(child)
-    task.spawn(function()
-        if getgenv().Config.DeleteMap and not IsEssential(child) then
-            task.wait(0.1)
-            if not IsEssential(child) then child:Destroy() return end
-        end
-        LowGFX(child)
-        for _, v in pairs(child:GetDescendants()) do LowGFX(v) end
-    end)
-end)
-
-local function SetupAnimationHook(char)
-    local humanoid = char:WaitForChild("Humanoid", 5)
-    if not humanoid then return end
-    humanoid.AnimationPlayed:Connect(function(track)
-        if getgenv().Config.NoAnimation then
-            local animName = track.Name:lower()
-            if animName:find("attack") or animName:find("slash") or animName:find("swing") or animName:find("hit") then
-                track:Stop()
-            end
-        end
-    end)
-end
-
-LocalPlayer.CharacterAdded:Connect(SetupAnimationHook)
-if LocalPlayer.Character then SetupAnimationHook(LocalPlayer.Character) end
-
-local function ExecuteAttack()
-    local controller
-    pcall(function() controller = CombatFramework.activeController end)
-    if controller and controller.equipped then
-        local count = 0
-        repeat
-            if getgenv().Config.NoCooldown then
-                controller.attackInterval = 0 
-                controller.timeToNextAttack = 0
-                controller.hitboxCreated = false
-            end
-            pcall(function() controller:attack() end)
-            count = count + 1
-        until count >= getgenv().Config.AttackRepeat
+local function ServerHop()
+    local PlaceID = game.PlaceId
+    local JobID = game.JobId
+    local API = "https://games.roblox.com/v1/games/" .. PlaceID .. "/servers/Public?sortOrder=Asc&limit=100"
+    
+    local function GetServers(cursor)
+        local url = API .. (cursor and "&cursor=" .. cursor or "")
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet(url))
+        end)
+        return success and result or nil
     end
+
+    task.spawn(function()
+        local cursor = nil
+        while true do
+            local servers = GetServers(cursor)
+            if not servers then break end
+            for _, server in pairs(servers.data) do
+                if server.id ~= JobID and server.playing < server.maxPlayers then
+                    if getgenv().Config.LowPlayerServer and server.playing > 8 then continue end
+                    pcall(function() TeleportService:TeleportToPlaceInstance(PlaceID, server.id, LocalPlayer) end)
+                    task.wait(1)
+                end
+            end
+            cursor = servers.nextPageCursor
+            if not cursor then break end
+            task.wait(0.1)
+        end
+    end)
 end
 
-local function ApplyESP(plr)
-    if not getgenv().Config.PlayerESP then return end
-    if plr ~= LocalPlayer and plr.Character and not plr.Character:FindFirstChild("ESPHighlight") then
-        local highlight = Instance.new("Highlight", plr.Character)
-        highlight.Name = "ESPHighlight"
-        highlight.FillColor = Color3.fromRGB(255, 0, 0)
-        highlight.FillTransparency = 0.5
-        highlight.OutlineTransparency = 1
+local function CheckAdmin(player)
+    if not getgenv().Config.AntiAdmin then return end
+    local isStaff = false
+    pcall(function()
+        if player:GetRankInGroup(game.CreatorId) >= 200 or player:GetRankInGroup(4442245) >= 200 then
+            isStaff = true
+        end
+    end)
+    local adminNames = {"admin", "mod", "staff", "owner", "tester"}
+    for _, name in pairs(adminNames) do
+        if string.find(player.Name:lower(), name) then isStaff = true end
+    end
+    if isStaff then
+        if getgenv().Config.ServerHopOnAdmin then ServerHop() else LocalPlayer:Kick("Admin Detected") end
     end
 end
 
@@ -152,6 +158,69 @@ local function GetNearestTarget()
     return target
 end
 
+local function ExecuteAttack()
+    local target = GetNearestTarget()
+    if not target then return end
+    local dist = (target.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+    if dist > getgenv().Config.SafeMagnitude then return end
+
+    local controller
+    pcall(function() controller = CombatFramework.activeController end)
+    if controller and controller.equipped then
+        local count = 0
+        local repeatCount = getgenv().Config.AttackRepeat
+        if getgenv().Config.RandomizeDelay then repeatCount = math.random(repeatCount - 3, repeatCount + 2) end
+        repeat
+            if getgenv().Config.NoCooldown then
+                controller.attackInterval = 0 
+                controller.timeToNextAttack = 0
+                controller.hitboxCreated = false
+            end
+            pcall(function() controller:attack() end)
+            count = count + 1
+            if getgenv().Config.RandomizeDelay then task.wait(math.random(1, 5) / 100) end
+        until count >= repeatCount
+    end
+end
+
+local function ApplyESP(plr)
+    if not getgenv().Config.PlayerESP then return end
+    if plr ~= LocalPlayer and plr.Character and not plr.Character:FindFirstChild("ESPHighlight") then
+        local highlight = Instance.new("Highlight", plr.Character)
+        highlight.Name = "ESPHighlight"
+        highlight.FillColor = Color3.fromRGB(255, 0, 0)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 1
+    end
+end
+
+local function SetupAnimationHook(char)
+    local humanoid = char:WaitForChild("Humanoid", 5)
+    if not humanoid then return end
+    humanoid.AnimationPlayed:Connect(function(track)
+        if getgenv().Config.NoAnimation then
+            local animName = track.Name:lower()
+            if animName:find("attack") or animName:find("slash") or animName:find("swing") or animName:find("hit") then
+                track:Stop()
+            end
+        end
+    end)
+end
+
+workspace.ChildAdded:Connect(function(child)
+    task.spawn(function()
+        if getgenv().Config.DeleteMap and not IsEssential(child) then
+            task.wait(0.1)
+            if not IsEssential(child) then child:Destroy() return end
+        end
+        LowGFX(child)
+        for _, v in pairs(child:GetDescendants()) do LowGFX(v) end
+    end)
+end)
+
+LocalPlayer.CharacterAdded:Connect(SetupAnimationHook)
+if LocalPlayer.Character then SetupAnimationHook(LocalPlayer.Character) end
+
 local waterPart = Instance.new("Part", workspace)
 waterPart.Name = "WaterPlatform"
 waterPart.Size = Vector3.new(2000, 2, 2000)
@@ -163,10 +232,24 @@ RunService.RenderStepped:Connect(function()
     local myHrp = LocalPlayer.Character.HumanoidRootPart
     waterPart.Position = Vector3.new(myHrp.Position.X, myHrp.Position.Y - 3.5, myHrp.Position.Z)
     waterPart.CanCollide = getgenv().Config.WalkOnWater
+    
     local target = GetNearestTarget()
-    if getgenv().Config.Camlock and target then
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+    if target then
+        local targetPos = target.Position
+        if getgenv().Config.Prediction then
+            targetPos = targetPos + (target.Velocity * getgenv().Config.PredictionIntensity)
+        end
+        if getgenv().Config.Camlock then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+        end
+        if getgenv().Config.AutoFace then
+            myHrp.CFrame = CFrame.new(myHrp.Position, Vector3.new(targetPos.X, myHrp.Position.Y, targetPos.Z))
+        end
+        if getgenv().Config.TeleportToTarget then
+            myHrp.CFrame = target.CFrame * CFrame.new(getgenv().Config.TpOffset)
+        end
     end
+
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = plr.Character.HumanoidRootPart
@@ -180,9 +263,6 @@ RunService.RenderStepped:Connect(function()
                 hrp.Size = Vector3.new(2, 2, 1)
             end
         end
-    end
-    if getgenv().Config.AutoFace and target then
-        myHrp.CFrame = CFrame.new(myHrp.Position, Vector3.new(target.Position.X, myHrp.Position.Y, target.Position.Z))
     end
 end)
 
@@ -200,9 +280,12 @@ RunService.Stepped:Connect(function()
         if moveDir.Magnitude > 0 then
             myHrp.CFrame = myHrp.CFrame + (moveDir * (getgenv().Config.FlySpeed / 50))
         end
-        myHrp.Velocity = Vector3.new(0, 0, 0)
+        myHrp.Velocity = getgenv().Config.HideVelocity and Vector3.new(0, 1.1, 0) or Vector3.zero
     end
 end)
+
+Players.PlayerAdded:Connect(CheckAdmin)
+for _, plr in pairs(Players:GetPlayers()) do if plr ~= LocalPlayer then CheckAdmin(plr) end end
 
 task.spawn(function()
     InitialOptimize()
@@ -210,8 +293,8 @@ task.spawn(function()
         if getgenv().Config.FastAttack then ExecuteAttack() end
         if getgenv().Config.AntiSit and LocalPlayer.Character then
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false) end
+            if hum then hum.Sit = false end
         end
-        task.wait()
+        task.wait(0.1)
     end
 end)
