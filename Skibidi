@@ -1,0 +1,265 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+
+local Config = {
+    FastAttack = true,
+    AttackBypass = true,
+    AttackDelayMin = 0.0004,
+    AttackDelayMax = 0.0012,
+    Aimlock = true,
+    Camlock = true,
+    AimFOV = 220,
+    HitboxExtender = true,
+    HitboxSize = 25, 
+    AntiSit = true,
+    NoAnimation = true,
+    NoAttackEffects = true,
+    FixLag = true,
+    Noclip = true
+}
+
+local States = {
+    FastAttack = Config.FastAttack,
+    Aimlock = Config.Aimlock,
+    Camlock = Config.Camlock,
+    HitboxExtender = Config.HitboxExtender,
+    AttackBypass = Config.AttackBypass,
+    NoAttackEffects = Config.NoAttackEffects,
+    FixLag = Config.FixLag,
+    Noclip = Config.Noclip
+}
+
+if States.FixLag then
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    if Workspace:FindFirstChild("Terrain") then
+        Workspace.Terrain.WaterWaveSize = 0
+        Workspace.Terrain.WaterWaveSpeed = 0
+        Workspace.Terrain.WaterReflectance = 0
+        Workspace.Terrain.WaterTransparency = 0
+    end
+    
+    local function applyAntiLag(v)
+        if v:IsA("BasePart") and not v:IsA("MeshPart") and v.Name ~= "HitboxExt" then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+            v.CastShadow = false
+        elseif v:IsA("Decal") or (v:IsA("Texture") and v.Name ~= "hand") then
+            v.Transparency = 1
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v.Lifetime = NumberRange.new(0)
+        elseif v:IsA("MeshPart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+            v.CastShadow = false
+        end
+    end
+
+    task.spawn(function()
+        local descendants = game:GetDescendants()
+        for i, v in ipairs(descendants) do
+            pcall(applyAntiLag, v)
+            if i % 200 == 0 then task.wait() end 
+        end
+    end)
+
+    game.DescendantAdded:Connect(function(v)
+        pcall(applyAntiLag, v)
+    end)
+end
+
+pcall(function()
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" or method:find("Ban") or (method == "FireServer" and tostring(self):lower():find("kick")) then
+            return nil
+        end
+        return oldNamecall(self, ...)
+    end)
+    setreadonly(mt, true)
+end)
+
+local CombatFramework
+pcall(function()
+    CombatFramework = require(LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("CombatFramework", 8))
+end)
+
+local function SuperFastAttack()
+    if not CombatFramework or not States.FastAttack then return end
+    local controller = CombatFramework.activeController
+    if not controller or not controller.equipped then return end
+
+    if States.AttackBypass then
+        controller.focusStart = 0
+        controller.currentAttackTrack = 0
+        controller.blocking = false
+        controller.active = true
+        controller.attacking = true
+        controller.timeToNextAttack = 0
+        controller.attackInterval = 0.0001
+        controller.increment = 5
+        controller.hitboxMagnitude = 1400
+        
+        if controller.animator and controller.animator.anims then
+            for _, animTable in pairs(controller.animator.anims) do
+                if type(animTable) == "table" then
+                    for i = 1, 30 do animTable[i] = true end
+                end
+            end
+        end
+        
+        if LocalPlayer.Character then
+            controller.humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+            controller.rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        end
+    end
+
+    local delay = Config.AttackDelayMin + math.random() * (Config.AttackDelayMax - Config.AttackDelayMin)
+    controller.timeToNextAttack = 0
+    controller.attackInterval = delay
+    
+    for i = 1, 5 do
+        task.spawn(function() pcall(controller.attack, controller) end)
+    end
+end
+
+local function GetClosestTarget()
+    local closest, minDist = nil, Config.AimFOV
+    local cam = Workspace.CurrentCamera
+    if not cam then return nil end
+    local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
+    
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            local hum = plr.Character:FindFirstChild("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local screenPos, onScreen = cam:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        closest = hrp
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local HitboxParts = {}
+local lastExtendTime = 0
+
+local function ExtendHitbox(hrp)
+    if not hrp or HitboxParts[hrp] or not hrp.Parent then return end
+    local hum = hrp.Parent:FindFirstChild("Humanoid")
+    if not hum or hum.Health <= 0 then return end
+    
+    local char = LocalPlayer.Character
+    local myHrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not myHrp or (myHrp.Position - hrp.Position).Magnitude > 250 then return end
+    
+    local part = Instance.new("Part")
+    part.Name = "HitboxExt"
+    part.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
+    part.Transparency = 0.7
+    part.BrickColor = BrickColor.new("Bright red")
+    part.Material = Enum.Material.Neon
+    part.CanCollide = false
+    part.Anchored = false
+    part.Massless = true
+    part.Parent = hrp
+    part.CFrame = hrp.CFrame
+    
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0 = hrp
+    weld.Part1 = part
+    weld.Parent = part
+    
+    HitboxParts[hrp] = part
+end
+
+local function CleanHitboxes()
+    for hrp, part in pairs(HitboxParts) do
+        if part and part.Parent then part:Destroy() end
+        HitboxParts[hrp] = nil
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("Humanoid") or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local hum = char.Humanoid
+    local hrp = char.HumanoidRootPart
+
+    if States.Noclip then
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") and v.CanCollide then
+                v.CanCollide = false
+            end
+        end
+    end
+
+    if Config.AntiSit then
+        hum.Sit = false
+        hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+    end
+
+    if Config.NoAnimation then
+        local animator = hum:FindFirstChildOfClass("Animator")
+        if animator then
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                local name = track.Name:lower()
+                if name:find("attack") or name:find("combo") or name:find("slash") then
+                    track:Stop(0)
+                end
+            end
+        end
+    end
+
+    if States.HitboxExtender and (tick() - lastExtendTime) > 1 then
+        lastExtendTime = tick()
+        CleanHitboxes()
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                ExtendHitbox(plr.Character.HumanoidRootPart)
+            end
+        end
+        local enemies = Workspace:FindFirstChild("Enemies")
+        if enemies then
+            for _, enemy in ipairs(enemies:GetChildren()) do
+                if enemy:FindFirstChild("HumanoidRootPart") then
+                    ExtendHitbox(enemy.HumanoidRootPart)
+                end
+            end
+        end
+    end
+
+    if States.FastAttack then SuperFastAttack() end
+
+    if States.Aimlock or States.Camlock then
+        local target = GetClosestTarget()
+        if target and target.Parent and target.Parent:FindFirstChild("Humanoid") and target.Parent.Humanoid.Health > 0 then
+            local predict = target.Position + (target.Velocity * 0.12)
+            if States.Aimlock then
+                hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(predict.X, hrp.Position.Y, predict.Z))
+            end
+            if States.Camlock then
+                local cam = Workspace.CurrentCamera
+                if cam then cam.CFrame = CFrame.new(cam.CFrame.Position, predict) end
+            end
+        end
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    CleanHitboxes()
+end)
