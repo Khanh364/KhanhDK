@@ -1,4 +1,4 @@
-if not game:IsLoaded() then game.Loaded:Wait() end
+repeat task.wait() until game:IsLoaded()
 local P_Serv = game:GetService("Players")
 local LP = P_Serv.LocalPlayer or P_Serv:GetPropertyChangedSignal("LocalPlayer"):Wait()
 
@@ -27,6 +27,7 @@ local Blacklist = {}
 local bLabel = nil
 local lastUISearch = 0
 
+-- Hàm xử lý Bounty
 local function getRealBounty()
     local ls = LP:FindFirstChild("leaderstats")
     if ls then
@@ -47,23 +48,30 @@ local function getRealBounty()
     return 0
 end
 
-local FileName = "SkibidiEarned_" .. LP.UserId .. ".txt"
-local function SaveEarned(val)
-    pcall(function() if writefile then writefile(FileName, tostring(val)) end end)
-end
-
+local EarnedFileName = "SkibidiEarned_" .. LP.UserId .. ".txt"
+local function SaveEarned(val) pcall(function() if writefile then writefile(EarnedFileName, tostring(val)) end end) end
 local function LoadEarned()
     local val = 0
-    pcall(function()
-        if isfile and readfile and isfile(FileName) then val = tonumber(readfile(FileName)) or 0 end
-    end)
+    pcall(function() if isfile and readfile and isfile(EarnedFileName) then val = tonumber(readfile(EarnedFileName)) or 0 end end)
+    return val
+end
+
+-- Hàm xử lý Kills
+local KillFileName = "SkibidiKills_" .. LP.UserId .. ".txt"
+local function SaveKills(val) pcall(function() if writefile then writefile(KillFileName, tostring(val)) end end) end
+local function LoadKills()
+    local val = 0
+    pcall(function() if isfile and readfile and isfile(KillFileName) then val = tonumber(readfile(KillFileName)) or 0 end end)
     return val
 end
 
 local TotalEarned = LoadEarned() 
 local LastBounty = -1
+local TotalKills = LoadKills()
 local FrameCount, CurrentFPS = 0, 0
+local trackedHums = setmetatable({}, {__mode = "k"})
 
+-- Khởi tạo UI
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local UIStroke = Instance.new("UIStroke")
@@ -72,6 +80,7 @@ local Title = Instance.new("TextLabel")
 local TotalLabel = Instance.new("TextLabel")
 local EarnLabel = Instance.new("TextLabel")
 local BphLabel = Instance.new("TextLabel")
+local KillsLabel = Instance.new("TextLabel") 
 local StatLabel = Instance.new("TextLabel")
 local ResetBtn = Instance.new("TextButton")
 local ResetCorner = Instance.new("UICorner")
@@ -81,17 +90,21 @@ local ToggleCorner = Instance.new("UICorner")
 local ToggleStroke = Instance.new("UIStroke")
 
 local TargetUI
-pcall(function() TargetUI = type(gethui) == "function" and gethui() or S.CG end)
+pcall(function() if type(gethui) == "function" then TargetUI = gethui() end end)
+if not TargetUI then pcall(function() TargetUI = S.CG end) end
 if not TargetUI then TargetUI = LP:WaitForChild("PlayerGui") end
 
+ScreenGui.Name = "SkibidiProUI_" .. tostring(math.random(1000,9999))
+ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = TargetUI
+
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-MainFrame.Size = UDim2.new(0, 300, 0, 150)
+MainFrame.Size = UDim2.new(0, 340, 0, 180) 
 MainFrame.Active = true
-MainFrame.Draggable = false
+MainFrame.Draggable = true 
 
 UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 UIStroke.Parent = MainFrame; UIStroke.Thickness = 2
@@ -103,16 +116,17 @@ local function CreateLabel(obj, pos, size, color, text, textSize)
     obj.Text = text; obj.TextXAlignment = Enum.TextXAlignment.Left
 end
 
-CreateLabel(Title, UDim2.new(0.05, 0, 0.05, 0), UDim2.new(0, 280, 0, 20), Color3.fromRGB(85, 170, 255), "skibidi Vip Pro by khánh", 15)
-CreateLabel(TotalLabel, UDim2.new(0.05, 0, 0.25, 0), UDim2.new(0, 280, 0, 20), Color3.fromRGB(255, 255, 255), "TOTAL: --")
-CreateLabel(EarnLabel, UDim2.new(0.05, 0, 0.45, 0), UDim2.new(0, 280, 0, 20), Color3.fromRGB(0, 255, 120), "EARNED: 0")
-CreateLabel(BphLabel, UDim2.new(0.05, 0, 0.65, 0), UDim2.new(0, 280, 0, 20), Color3.fromRGB(255, 200, 50), "BPH: 0/h")
-CreateLabel(StatLabel, UDim2.new(0.05, 0, 0.85, 0), UDim2.new(0, 150, 0, 20), Color3.fromRGB(200, 200, 200), "FPS: -- | PING: --", 13)
+CreateLabel(Title, UDim2.new(0.05, 0, 0.05, 0), UDim2.new(0, 320, 0, 20), Color3.fromRGB(85, 170, 255), "skibidi Vip Pro by khánh", 16)
+CreateLabel(TotalLabel, UDim2.new(0.05, 0, 0.20, 0), UDim2.new(0, 320, 0, 20), Color3.fromRGB(255, 255, 255), "TOTAL: --")
+CreateLabel(EarnLabel, UDim2.new(0.05, 0, 0.35, 0), UDim2.new(0, 320, 0, 20), Color3.fromRGB(0, 255, 120), "EARNED: 0")
+CreateLabel(BphLabel, UDim2.new(0.05, 0, 0.50, 0), UDim2.new(0, 320, 0, 20), Color3.fromRGB(255, 200, 50), "BPH: 0/h")
+CreateLabel(KillsLabel, UDim2.new(0.05, 0, 0.65, 0), UDim2.new(0, 320, 0, 20), Color3.fromRGB(255, 100, 100), "KILLS: " .. tostring(TotalKills)) 
+CreateLabel(StatLabel, UDim2.new(0.05, 0, 0.80, 0), UDim2.new(0, 180, 0, 20), Color3.fromRGB(200, 200, 200), "FPS: -- | PING: --", 13)
 
-ResetBtn.Parent = MainFrame; ResetBtn.Size = UDim2.new(0, 135, 0, 30)
+ResetBtn.Parent = MainFrame; ResetBtn.Size = UDim2.new(0, 140, 0, 30)
 ResetBtn.AnchorPoint = Vector2.new(1, 1); ResetBtn.Position = UDim2.new(1, -10, 1, -10)
 ResetBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-ResetBtn.Text = "Reset Bounty Skibidi"; ResetBtn.TextColor3 = Color3.new(1,1,1)
+ResetBtn.Text = "Reset Skibidi"; ResetBtn.TextColor3 = Color3.new(1,1,1) -- Đã đổi tên ở đây
 ResetBtn.Font = Enum.Font.GothamBold; ResetBtn.TextSize = 12
 ResetCorner.CornerRadius = UDim.new(0, 6); ResetCorner.Parent = ResetBtn
 
@@ -148,7 +162,8 @@ end
 
 ResetBtn.MouseButton1Click:Connect(function()
     TotalEarned = 0; LastBounty = getRealBounty(); SaveEarned(TotalEarned)
-    EarnLabel.Text = "EARNED: 0"; BphLabel.Text = "BPH: 0/h"
+    TotalKills = 0; SaveKills(TotalKills)
+    EarnLabel.Text = "EARNED: 0"; BphLabel.Text = "BPH: 0/h"; KillsLabel.Text = "KILLS: 0"
 end)
 
 S.RS.RenderStepped:Connect(function() FrameCount = FrameCount + 1 end)
@@ -161,7 +176,8 @@ t_spawn(function()
             if LastBounty == -1 and current > 0 then LastBounty = current end
             if LastBounty ~= -1 and current < 30000000 then
                 if current > LastBounty then
-                    TotalEarned = TotalEarned + (current - LastBounty); SaveEarned(TotalEarned)
+                    TotalEarned = TotalEarned + (current - LastBounty)
+                    SaveEarned(TotalEarned)
                 end
             end
             LastBounty = current
@@ -188,7 +204,8 @@ t_spawn(function()
                             if numStr then
                                 local val = tonumber(numStr)
                                 if val and val > 0 and val < 50000 then
-                                    TotalEarned = TotalEarned + val; SaveEarned(TotalEarned)
+                                    TotalEarned = TotalEarned + val
+                                    SaveEarned(TotalEarned)
                                 end
                             end
                         end
@@ -255,13 +272,8 @@ t_spawn(function()
             Terrain.WaterTransparency = 0
         end
 
-        for _, v in ipairs(S.W:GetDescendants()) do
-            pcall(applyAllSmoothGraphics, v)
-        end
-
-        S.W.DescendantAdded:Connect(function(v)
-            pcall(applyAllSmoothGraphics, v)
-        end)
+        for _, v in ipairs(S.W:GetDescendants()) do pcall(applyAllSmoothGraphics, v) end
+        S.W.DescendantAdded:Connect(function(v) pcall(applyAllSmoothGraphics, v) end)
     end)
 end)
 
@@ -270,9 +282,7 @@ t_spawn(function()
         pcall(function()
             if LP.Character and LP.Character:FindFirstChild("Humanoid") and LP.Character.Humanoid.Health > 0 then
                 local hrp = LP.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    LP.Character.Humanoid:Move(v3_new(0, 0, -1), true)
-                end
+                if hrp then LP.Character.Humanoid:Move(v3_new(0, 0, -1), true) end
             end
         end)
     end)
@@ -348,6 +358,19 @@ t_spawn(function()
 
                 local d = (LP.Character.HumanoidRootPart.Position - t.HumanoidRootPart.Position).Magnitude
                 getgenv().LockedTarget = (d <= 300 and not getgenv().Retreating) and t or nil
+                
+                -- Logic đếm Kills Mới
+                if getgenv().LockedTarget then
+                    local hum = t.Humanoid
+                    if not trackedHums[hum] then
+                        trackedHums[hum] = true
+                        hum.Died:Connect(function()
+                            TotalKills = TotalKills + 1
+                            SaveKills(TotalKills)
+                            pcall(function() KillsLabel.Text = "KILLS: " .. tostring(TotalKills) end)
+                        end)
+                    end
+                end
 
                 if getgenv().LockedTarget == t then
                     tmr[t.Name] = (tmr[t.Name] or 0) + dt
